@@ -23,9 +23,10 @@ BUFFER_PADDING :: 16
 GUTTER_PADDING :: 48
 
 Globals :: struct {
-    running: bool,
-    fps:     int,
-    dt:      f64,
+    running:   bool,
+    fps:       int,
+    dt:        f64,
+    glyph_map: map[rune]^sdl.Texture,
 }
 
 globals := Globals {
@@ -68,62 +69,78 @@ sdl_poll_events :: proc() {
     }
 }
 
-draw_file_text :: proc(text: string, pos: vec2, color: sdl.Color) {
-    ctext := strings.clone_to_cstring(text)
-    text := ttf.RenderText_Blended(font, ctext, 0, color)
-    texture: ^sdl.Texture
-    if text != nil {
-        texture = sdl.CreateTextureFromSurface(sdl_renderer, text)
-        sdl.DestroySurface(text)
+generate_glyph_map :: proc() -> map[rune]^sdl.Texture {
+    glyphs_to_generate := "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"£$%^&*()-_=+[]{};:'@#~,./<>?\\|¬"
+    glyph_map := map[rune]^sdl.Texture{}
+
+    for glyph in glyphs_to_generate {
+        crune := fmt.ctprint(glyph)
+        text := ttf.RenderText_Blended(font, crune, 0, COLOR_WHITE)
+        texture := sdl.CreateTextureFromSurface(sdl_renderer, text)
+        if texture == nil {
+            fmt.println("Failed to create texture for glyph", glyph)
+        }
+        glyph_map[glyph] = texture
     }
 
-    w, h: f32
-    sdl.GetTextureSize(texture, &w, &h)
-    dst := sdl.FRect {
-        x = pos.x,
-        y = pos.y,
-        w = w,
-        h = h,
-    }
+    return glyph_map
+}
 
-    sdl.SetRenderDrawColor(sdl_renderer, 255, 255, 255, 255)
-    sdl.RenderTexture(sdl_renderer, texture, nil, &dst)
-    sdl.DestroyTexture(texture)
-    delete(ctext)
+destroy_glyph_map :: proc() {
+    for key in globals.glyph_map {
+        sdl.DestroyTexture(globals.glyph_map[key])
+    }
+    delete(globals.glyph_map)
+}
+
+draw_text :: proc(text: string, pos: vec2, color: sdl.Color) {
+    for char in text {
+        texture := globals.glyph_map[char]
+        w, h: f32
+        sdl.GetTextureSize(texture, &w, &h)
+        dst := sdl.FRect {
+            x = pos.x,
+            y = pos.y,
+            w = w,
+            h = h,
+        }
+        sdl.RenderTexture(sdl_renderer, texture, nil, &dst)
+    }
+}
+
+draw_file_text :: proc(file_data: string) {
+    lines := strings.split_lines(file_data, context.temp_allocator)
+    for line, i in lines {
+        // draw_text(fmt.tprint(i), {CHARACTER_SPACING + BUFFER_PADDING, f32(i * LINE_HEIGHT) + BUFFER_PADDING}, COLOR_GRAY)
+        for char, j in line {
+            char_str := utf8.runes_to_string({char}, context.temp_allocator)
+            draw_text(
+                char_str,
+                {f32(j * CHARACTER_SPACING) + BUFFER_PADDING, f32(i * LINE_HEIGHT) + BUFFER_PADDING},
+                COLOR_WHITE,
+            )
+        }
+    }
 }
 
 main :: proc() {
     sdl_init()
     ttf_init := ttf.Init(); assert(ttf_init)
     font = ttf.OpenFont("GeistMono-Regular.ttf", FONT_SIZE)
+    globals.glyph_map = generate_glyph_map()
 
     raw_file_data, load_ok := os.read_entire_file("main.odin", context.allocator)
     data := string(raw_file_data)
-    lines := strings.split_lines(data)
 
     for (globals.running) {
         sdl_poll_events()
 
         sdl.SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255)
         sdl.RenderClear(sdl_renderer)
+        draw_file_text(data)
 
-        // for line, i in lines {
-        //     draw_file_text(
-        //         fmt.tprint(i),
-        //         {CHARACTER_SPACING + BUFFER_PADDING, f32(i * LINE_HEIGHT) + BUFFER_PADDING},
-        //         COLOR_GRAY,
-        //     )
-        //     for char, j in line {
-        //         char_str := utf8.runes_to_string({char}, context.temp_allocator)
-        //         draw_file_text(
-        //             char_str,
-        //             {f32(j * CHARACTER_SPACING) + BUFFER_PADDING + GUTTER_PADDING, f32(i * LINE_HEIGHT) + BUFFER_PADDING},
-        //             COLOR_WHITE,
-        //         )
-        //     }
-        // }
-
-        calc_frame_info()
         sdl.RenderPresent(sdl_renderer)
+        calc_frame_info()
+        free_all(context.temp_allocator)
     }
 }
