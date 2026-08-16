@@ -1,0 +1,8 @@
+Line one
+
+int x = 10;
+
+int main() {
+    int y = 200;
+    printf("hello world\n");
+}
