@@ -7,13 +7,14 @@ import "core:unicode/utf8"
 import sdl "vendor:sdl3"
 import ttf "vendor:sdl3/ttf"
 
-SCREEN_WIDTH :: 16 * 50
-SCREEN_HEIGHT :: 9 * 50
+DEFAULT_SCREEN_WIDTH :: 16 * 50
+DEFAULT_SCREEN_HEIGHT :: 9 * 50
 SCREEN_MIN_WIDTH :: 16 * 25
 SCREEN_MIN_HEIGHT :: 9 * 25
 FONT_SIZE :: 12
 LINE_HEIGHT :: 16
 CHARACTER_SPACING :: 8
+SCROLL_SPEED :: 50
 vec2 :: [2]f32
 
 COLOR_WHITE :: sdl.Color{255, 255, 255, 255}
@@ -23,10 +24,12 @@ BUFFER_PADDING :: 16
 GUTTER_PADDING :: 48
 
 Globals :: struct {
-    running:   bool,
-    fps:       int,
-    dt:        f64,
-    glyph_map: map[rune]^sdl.Texture,
+    running:         bool,
+    fps:             int,
+    dt:              f64,
+    glyph_map:       map[rune]^sdl.Texture,
+    viewport_offset: vec2,
+    cursor_pos:      vec2,
 }
 
 globals := Globals {
@@ -48,7 +51,7 @@ calc_frame_info :: proc() {
 
 sdl_init :: proc() {
     ok_init := sdl.Init({.VIDEO})
-    sdl_window = sdl.CreateWindow("Editor", SCREEN_WIDTH, SCREEN_HEIGHT, {.RESIZABLE, .HIGH_PIXEL_DENSITY})
+    sdl_window = sdl.CreateWindow("Editor", DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT, {.RESIZABLE, .HIGH_PIXEL_DENSITY})
     sdl_renderer = sdl.CreateRenderer(sdl_window, nil)
     sdl.SetWindowMinimumSize(sdl_window, SCREEN_MIN_WIDTH, SCREEN_MIN_HEIGHT)
     ok_vsync := sdl.SetRenderVSync(sdl_renderer, 1)
@@ -65,6 +68,32 @@ sdl_poll_events :: proc() {
         #partial switch event.type {
         case .QUIT:
             globals.running = false
+        case .KEY_DOWN:
+            #partial switch event.key.scancode {
+            case .DOWN:
+                globals.cursor_pos.y += LINE_HEIGHT
+            case .UP:
+                globals.cursor_pos.y -= LINE_HEIGHT
+                if globals.cursor_pos.y < 0 {
+                    globals.cursor_pos.y = 0
+                }
+            case .LEFT:
+                globals.cursor_pos.x -= 8
+                if globals.cursor_pos.x < 0 {
+                    globals.cursor_pos.x = 0
+                }
+            case .RIGHT:
+                globals.cursor_pos.x += 8
+            }
+        case .MOUSE_WHEEL:
+            if event.wheel.y < 0 {
+                globals.viewport_offset.y += SCROLL_SPEED
+            } else if event.wheel.y > 0 {
+                globals.viewport_offset.y -= SCROLL_SPEED
+                if globals.viewport_offset.y < 0 {
+                    globals.viewport_offset.y = 0
+                }
+            }
         }
     }
 }
@@ -99,8 +128,8 @@ draw_text :: proc(text: string, pos: vec2, color: sdl.Color) {
         w, h: f32
         sdl.GetTextureSize(texture, &w, &h)
         dst := sdl.FRect {
-            x = pos.x,
-            y = pos.y,
+            x = pos.x - globals.viewport_offset.x,
+            y = pos.y - globals.viewport_offset.y,
             w = w,
             h = h,
         }
@@ -123,6 +152,16 @@ draw_file_text :: proc(file_data: string) {
     }
 }
 
+draw_cursor :: proc() {
+    rect := sdl.FRect {
+        x = globals.cursor_pos.x + BUFFER_PADDING,
+        y = globals.cursor_pos.y + BUFFER_PADDING + 3,
+        w = 1,
+        h = FONT_SIZE,
+    }
+    sdl.RenderFillRect(sdl_renderer, &rect)
+}
+
 main :: proc() {
     sdl_init()
     ttf_init := ttf.Init(); assert(ttf_init)
@@ -138,6 +177,9 @@ main :: proc() {
         sdl.SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255)
         sdl.RenderClear(sdl_renderer)
         draw_file_text(data)
+
+        sdl.SetRenderDrawColor(sdl_renderer, 255, 255, 255, 255)
+        draw_cursor()
 
         sdl.RenderPresent(sdl_renderer)
         calc_frame_info()
