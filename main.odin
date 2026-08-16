@@ -12,7 +12,7 @@ DEFAULT_SCREEN_HEIGHT :: 9 * 50
 SCREEN_MIN_WIDTH :: 16 * 25
 SCREEN_MIN_HEIGHT :: 9 * 25
 FONT_SIZE :: 12
-LINE_HEIGHT :: 16
+LINE_HEIGHT :: 20
 CHARACTER_SPACING :: 8
 SCROLL_SPEED :: 50
 vec2 :: [2]f32
@@ -47,6 +47,10 @@ calc_frame_info :: proc() {
     globals.dt = (f64(fps_timer_now) - f64(fps_timer_prev)) / f64(sdl.GetPerformanceFrequency())
     globals.fps = int(1 / globals.dt)
     fps_timer_prev = fps_timer_now
+}
+
+to_world_space :: proc(pos: vec2) -> vec2 {
+    return {pos.x - globals.viewport_offset.x, pos.y - globals.viewport_offset.y}
 }
 
 sdl_init :: proc() {
@@ -153,10 +157,11 @@ draw_file_text :: proc(file_data: string) {
 }
 
 draw_cursor :: proc() {
+    pos := to_world_space(globals.cursor_pos)
     rect := sdl.FRect {
-        x = globals.cursor_pos.x + BUFFER_PADDING,
-        y = globals.cursor_pos.y + BUFFER_PADDING + 3,
-        w = 1,
+        x = pos.x + BUFFER_PADDING,
+        y = pos.y + BUFFER_PADDING + 3,
+        w = 2,
         h = FONT_SIZE,
     }
     sdl.RenderFillRect(sdl_renderer, &rect)
