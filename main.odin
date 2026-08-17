@@ -20,7 +20,7 @@ vec2 :: [2]f32
 COLOR_WHITE :: sdl.Color{255, 255, 255, 255}
 COLOR_GRAY :: sdl.Color{128, 128, 128, 255}
 COLOR_BLACK :: sdl.Color{0, 0, 0, 255}
-BUFFER_PADDING :: 16
+BUFFER_PADDING :: 32
 GUTTER_PADDING :: 48
 
 Globals :: struct {
@@ -30,6 +30,7 @@ Globals :: struct {
     glyph_map:       map[rune]^sdl.Texture,
     viewport_offset: vec2,
     cursor_pos:      vec2,
+    active_buffer:   []string,
 }
 
 globals := Globals {
@@ -51,6 +52,12 @@ calc_frame_info :: proc() {
 
 to_world_space :: proc(pos: vec2) -> vec2 {
     return {pos.x - globals.viewport_offset.x, pos.y - globals.viewport_offset.y}
+}
+
+load_buffer :: proc(filename: string) {
+    raw_file_data, load_ok := os.read_entire_file(filename, context.allocator)
+    data := string(raw_file_data)
+    globals.active_buffer = strings.split_lines(data)
 }
 
 sdl_init :: proc() {
@@ -75,19 +82,41 @@ sdl_poll_events :: proc() {
         case .KEY_DOWN:
             #partial switch event.key.scancode {
             case .DOWN:
-                globals.cursor_pos.y += LINE_HEIGHT
+                globals.cursor_pos.y += 1
+                if globals.cursor_pos.y > f32(len(globals.active_buffer) - 1) {
+                    globals.cursor_pos.y = f32(len(globals.active_buffer) - 1)
+                }
+                if len(globals.active_buffer[int(globals.cursor_pos.y)]) < int(globals.cursor_pos.x) {
+                    globals.cursor_pos.x = f32(len(globals.active_buffer[int(globals.cursor_pos.y)]))
+                }
             case .UP:
-                globals.cursor_pos.y -= LINE_HEIGHT
+                globals.cursor_pos.y -= 1
                 if globals.cursor_pos.y < 0 {
                     globals.cursor_pos.y = 0
                 }
+                if len(globals.active_buffer[int(globals.cursor_pos.y)]) < int(globals.cursor_pos.x) {
+                    globals.cursor_pos.x = f32(len(globals.active_buffer[int(globals.cursor_pos.y)]))
+                }
             case .LEFT:
-                globals.cursor_pos.x -= 8
+                globals.cursor_pos.x -= 1
                 if globals.cursor_pos.x < 0 {
-                    globals.cursor_pos.x = 0
+                    if globals.cursor_pos.y - 1 >= 0 {
+                        globals.cursor_pos.x = f32(len(globals.active_buffer[int(globals.cursor_pos.y - 1)]))
+                        if globals.cursor_pos.y != 0 {
+                            globals.cursor_pos.y -= 1
+                        }
+                    } else {
+                        globals.cursor_pos.x = 0
+                    }
                 }
             case .RIGHT:
-                globals.cursor_pos.x += 8
+                globals.cursor_pos.x += 1
+                if globals.cursor_pos.x > f32(len(globals.active_buffer[int(globals.cursor_pos.y)])) {
+                    globals.cursor_pos.x = 0
+                    if globals.cursor_pos.y != f32(len(globals.active_buffer) - 1) {
+                        globals.cursor_pos.y += 1
+                    }
+                }
             }
         case .MOUSE_WHEEL:
             if event.wheel.y < 0 {
@@ -141,9 +170,8 @@ draw_text :: proc(text: string, pos: vec2, color: sdl.Color) {
     }
 }
 
-draw_file_text :: proc(file_data: string) {
-    lines := strings.split_lines(file_data, context.temp_allocator)
-    for line, i in lines {
+draw_buffer :: proc() {
+    for line, i in globals.active_buffer {
         // draw_text(fmt.tprint(i), {CHARACTER_SPACING + BUFFER_PADDING, f32(i * LINE_HEIGHT) + BUFFER_PADDING}, COLOR_GRAY)
         for char, j in line {
             char_str := utf8.runes_to_string({char}, context.temp_allocator)
@@ -159,8 +187,8 @@ draw_file_text :: proc(file_data: string) {
 draw_cursor :: proc() {
     pos := to_world_space(globals.cursor_pos)
     rect := sdl.FRect {
-        x = pos.x + BUFFER_PADDING,
-        y = pos.y + BUFFER_PADDING + 3,
+        x = (pos.x * CHARACTER_SPACING) + BUFFER_PADDING,
+        y = (pos.y * LINE_HEIGHT) + BUFFER_PADDING + 3,
         w = 2,
         h = FONT_SIZE,
     }
@@ -172,16 +200,14 @@ main :: proc() {
     ttf_init := ttf.Init(); assert(ttf_init)
     font = ttf.OpenFont("GeistMono-Regular.ttf", FONT_SIZE)
     globals.glyph_map = generate_glyph_map()
-
-    raw_file_data, load_ok := os.read_entire_file("main.odin", context.allocator)
-    data := string(raw_file_data)
+    load_buffer("test.txt")
 
     for (globals.running) {
         sdl_poll_events()
 
         sdl.SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255)
         sdl.RenderClear(sdl_renderer)
-        draw_file_text(data)
+        draw_buffer()
 
         sdl.SetRenderDrawColor(sdl_renderer, 255, 255, 255, 255)
         draw_cursor()
