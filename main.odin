@@ -180,6 +180,32 @@ draw_text :: proc(text: string, pos: vec2, color: sdl.Color) {
     }
 }
 
+// draws a non monospace font word
+draw_word :: proc(word: string, pos: vec2) {
+    x_pos_count: f32 = 0
+    space_width := 32
+
+    for char in word {
+        if char == ' ' {
+            x_pos_count += get_font_size() / 2
+            continue
+        }
+
+        texture := globals.glyph_map[char]
+        w, h: f32
+        sdl.GetTextureSize(texture, &w, &h)
+        fmt.println(w, h)
+        dst := sdl.FRect {
+            x = pos.x + x_pos_count - globals.viewport_offset.x,
+            y = pos.y - globals.viewport_offset.y,
+            w = w,
+            h = h,
+        }
+        sdl.RenderTexture(sdl_renderer, texture, nil, &dst)
+        x_pos_count += w
+    }
+}
+
 draw_buffer :: proc() {
     for line, i in globals.active_buffer {
         // draw_text(fmt.tprint(i), {CHARACTER_SPACING + BUFFER_PADDING, f32(i * LINE_HEIGHT) + BUFFER_PADDING}, COLOR_GRAY)
@@ -210,9 +236,9 @@ draw_cursor :: proc() {
     pos := to_world_space(globals.cursor_pos)
     rect := sdl.FRect {
         x = (pos.x * get_character_spacing()) + BUFFER_PADDING,
-        y = (pos.y * get_line_height()) + BUFFER_PADDING + 3,
-        w = 2,
-        h = get_font_size(),
+        y = (pos.y * get_line_height()) + BUFFER_PADDING - 3,
+        w = 4,
+        h = get_line_height(),
     }
     sdl.RenderFillRect(sdl_renderer, &rect)
 }
@@ -222,7 +248,7 @@ main :: proc() {
     ttf_init := ttf.Init(); assert(ttf_init)
     font = ttf.OpenFont("GeistMono-Regular.ttf", get_font_size())
     globals.glyph_map = generate_glyph_map()
-    load_buffer("main.odin")
+    load_buffer("test.txt")
 
     for (globals.running) {
         sdl_poll_events()
