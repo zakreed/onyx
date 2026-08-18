@@ -100,6 +100,8 @@ sdl_poll_events :: proc() {
             #partial switch event.key.scancode {
             case .BACKSPACE:
                 buffer_remove_at_cursor()
+            case .KP_ENTER:
+                buffer_insert("\n")
             case .DOWN:
                 globals.cursor_pos.y += 1
                 if globals.cursor_pos.y > f32(len(globals.active_buffer) - 1) {
@@ -274,6 +276,27 @@ buffer_remove_at_cursor :: proc() {
     globals.cursor_pos.x -= 1
 }
 
+show_unsaved_changes_dialog :: proc() -> int {
+    buttons := []sdl.MessageBoxButtonData {
+        {flags = {.RETURNKEY_DEFAULT}, buttonID = 0, text = "Save"},
+        {flags = nil, buttonID = 1, text = "Discard"},
+        {flags = {.ESCAPEKEY_DEFAULT}, buttonID = 2, text = "Cancel"},
+    }
+    data := sdl.MessageBoxData {
+        flags      = {.WARNING},
+        window     = sdl_window,
+        title      = "Unsaved changes",
+        message    = "You have unsaved changes in this file. Do you want to save them?",
+        numbuttons = i32(len(buttons)),
+        buttons    = raw_data(buttons),
+    }
+    button_id: i32
+
+    sdl.ShowMessageBox(data, &button_id)
+
+    return int(button_id)
+}
+
 main :: proc() {
     sdl_init()
     ttf_init := ttf.Init(); assert(ttf_init)
@@ -300,4 +323,6 @@ main :: proc() {
         calc_frame_info()
         free_all(context.temp_allocator)
     }
+
+    unsaved_value := show_unsaved_changes_dialog()
 }
