@@ -94,8 +94,12 @@ sdl_poll_events :: proc() {
         #partial switch event.type {
         case .QUIT:
             globals.running = false
+        case .TEXT_INPUT:
+            buffer_insert(fmt.tprint(event.text.text))
         case .KEY_DOWN:
             #partial switch event.key.scancode {
+            case .BACKSPACE:
+                buffer_remove_at_cursor()
             case .DOWN:
                 globals.cursor_pos.y += 1
                 if globals.cursor_pos.y > f32(len(globals.active_buffer) - 1) {
@@ -243,12 +247,43 @@ draw_cursor :: proc() {
     sdl.RenderFillRect(sdl_renderer, &rect)
 }
 
+buffer_insert :: proc(char: string) {
+    builder: strings.Builder
+    current_line := globals.active_buffer[int(globals.cursor_pos.y)]
+
+    strings.builder_init(&builder)
+    strings.write_string(&builder, current_line[:int(globals.cursor_pos.x)])
+    strings.write_string(&builder, char)
+    strings.write_string(&builder, current_line[int(globals.cursor_pos.x):])
+
+    globals.active_buffer[int(globals.cursor_pos.y)] = strings.to_string(builder)
+    globals.cursor_pos.x += 1
+}
+
+buffer_remove_at_cursor :: proc() {
+    if globals.cursor_pos.x == 0 {return}
+
+    builder: strings.Builder
+    current_line := globals.active_buffer[int(globals.cursor_pos.y)]
+
+    strings.builder_init(&builder)
+    strings.write_string(&builder, current_line[:int(globals.cursor_pos.x) - 1])
+    strings.write_string(&builder, current_line[int(globals.cursor_pos.x):])
+
+    globals.active_buffer[int(globals.cursor_pos.y)] = strings.to_string(builder)
+    globals.cursor_pos.x -= 1
+}
+
 main :: proc() {
     sdl_init()
     ttf_init := ttf.Init(); assert(ttf_init)
     font = ttf.OpenFont("GeistMono-Regular.ttf", get_font_size())
     globals.glyph_map = generate_glyph_map()
     load_buffer("test.txt")
+    ok := sdl.StartTextInput(sdl_window)
+    if !ok {
+        fmt.println("[ERROR]: Failed to start text input")
+    }
 
     for (globals.running) {
         sdl_poll_events()
