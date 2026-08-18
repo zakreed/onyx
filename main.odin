@@ -1,6 +1,7 @@
 package main
 
 import "core:fmt"
+import "core:math"
 import "core:os"
 import "core:strings"
 import "core:unicode/utf8"
@@ -14,7 +15,8 @@ SCREEN_MIN_HEIGHT :: 9 * 25
 FONT_SIZE :: 12
 LINE_HEIGHT :: 20
 CHARACTER_SPACING :: 8
-SCROLL_SPEED :: 50
+SCROLL_SPEED :: 200
+SCROLL_FRICTION :: 4
 vec2 :: [2]f32
 
 COLOR_WHITE :: sdl.Color{255, 255, 255, 255}
@@ -24,13 +26,14 @@ BUFFER_PADDING :: 32
 GUTTER_PADDING :: 48
 
 Globals :: struct {
-    running:         bool,
-    fps:             int,
-    dt:              f64,
-    glyph_map:       map[rune]^sdl.Texture,
-    viewport_offset: vec2,
-    cursor_pos:      vec2,
-    active_buffer:   []string,
+    running:           bool,
+    fps:               int,
+    dt:                f64,
+    glyph_map:         map[rune]^sdl.Texture,
+    camera_scroll_vel: vec2,
+    viewport_offset:   vec2,
+    cursor_pos:        vec2,
+    active_buffer:     []string,
 }
 
 globals := Globals {
@@ -71,6 +74,18 @@ sdl_init :: proc() {
     assert(sdl_window != nil)
     assert(sdl_renderer != nil)
     assert(ok_vsync)
+}
+
+camera_update :: proc() {
+    globals.viewport_offset.x += globals.camera_scroll_vel.x * f32(globals.dt)
+    globals.viewport_offset.y += globals.camera_scroll_vel.y * f32(globals.dt)
+
+    if globals.viewport_offset.y < 0 {
+        globals.viewport_offset.y = 0
+    }
+
+    globals.camera_scroll_vel.x = math.lerp(globals.camera_scroll_vel.x, f32(0), f32(SCROLL_FRICTION) * f32(globals.dt))
+    globals.camera_scroll_vel.y = math.lerp(globals.camera_scroll_vel.y, f32(0), f32(SCROLL_FRICTION) * f32(globals.dt))
 }
 
 sdl_poll_events :: proc() {
@@ -119,13 +134,8 @@ sdl_poll_events :: proc() {
                 }
             }
         case .MOUSE_WHEEL:
-            if event.wheel.y < 0 {
-                globals.viewport_offset.y += SCROLL_SPEED
-            } else if event.wheel.y > 0 {
-                globals.viewport_offset.y -= SCROLL_SPEED
-                if globals.viewport_offset.y < 0 {
-                    globals.viewport_offset.y = 0
-                }
+            if event.wheel.y != 0 {
+                globals.camera_scroll_vel.y -= event.wheel.y * SCROLL_SPEED
             }
         }
     }
@@ -200,10 +210,11 @@ main :: proc() {
     ttf_init := ttf.Init(); assert(ttf_init)
     font = ttf.OpenFont("GeistMono-Regular.ttf", FONT_SIZE)
     globals.glyph_map = generate_glyph_map()
-    load_buffer("test.txt")
+    load_buffer("main.odin")
 
     for (globals.running) {
         sdl_poll_events()
+        camera_update()
 
         sdl.SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255)
         sdl.RenderClear(sdl_renderer)
