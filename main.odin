@@ -187,20 +187,32 @@ draw_buffer :: proc() {
             char_str := utf8.runes_to_string({char}, context.temp_allocator)
             draw_text(
                 char_str,
-                {f32(j * CHARACTER_SPACING) + BUFFER_PADDING, f32(i * LINE_HEIGHT) + BUFFER_PADDING},
+                {f32(j) * get_character_spacing() + BUFFER_PADDING, f32(i) * get_line_height() + BUFFER_PADDING},
                 COLOR_WHITE,
             )
         }
     }
 }
 
+get_font_size :: proc() -> f32 {
+    return FONT_SIZE * sdl.GetWindowPixelDensity(sdl_window)
+}
+
+get_line_height :: proc() -> f32 {
+    return LINE_HEIGHT * sdl.GetWindowPixelDensity(sdl_window)
+}
+
+get_character_spacing :: proc() -> f32 {
+    return CHARACTER_SPACING * sdl.GetWindowPixelDensity(sdl_window)
+}
+
 draw_cursor :: proc() {
     pos := to_world_space(globals.cursor_pos)
     rect := sdl.FRect {
-        x = (pos.x * CHARACTER_SPACING) + BUFFER_PADDING,
-        y = (pos.y * LINE_HEIGHT) + BUFFER_PADDING + 3,
+        x = (pos.x * get_character_spacing()) + BUFFER_PADDING,
+        y = (pos.y * get_line_height()) + BUFFER_PADDING + 3,
         w = 2,
-        h = FONT_SIZE,
+        h = get_font_size(),
     }
     sdl.RenderFillRect(sdl_renderer, &rect)
 }
@@ -208,7 +220,7 @@ draw_cursor :: proc() {
 main :: proc() {
     sdl_init()
     ttf_init := ttf.Init(); assert(ttf_init)
-    font = ttf.OpenFont("GeistMono-Regular.ttf", FONT_SIZE)
+    font = ttf.OpenFont("GeistMono-Regular.ttf", get_font_size())
     globals.glyph_map = generate_glyph_map()
     load_buffer("main.odin")
 
