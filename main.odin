@@ -8,8 +8,8 @@ import "core:unicode/utf8"
 import sdl "vendor:sdl3"
 import ttf "vendor:sdl3/ttf"
 
-DEFAULT_SCREEN_WIDTH :: 16 * 50
-DEFAULT_SCREEN_HEIGHT :: 9 * 50
+DEFAULT_SCREEN_WIDTH :: 16 * 100
+DEFAULT_SCREEN_HEIGHT :: 9 * 100
 SCREEN_MIN_WIDTH :: 16 * 25
 SCREEN_MIN_HEIGHT :: 9 * 25
 FONT_SIZE :: 12
@@ -51,10 +51,6 @@ calc_frame_info :: proc() {
     globals.dt = (f64(fps_timer_now) - f64(fps_timer_prev)) / f64(sdl.GetPerformanceFrequency())
     globals.fps = int(1 / globals.dt)
     fps_timer_prev = fps_timer_now
-}
-
-to_world_space :: proc(pos: vec2) -> vec2 {
-    return {pos.x - globals.viewport_offset.x, pos.y - globals.viewport_offset.y}
 }
 
 load_buffer :: proc(filename: string) {
@@ -189,7 +185,6 @@ draw_text :: proc(text: string, pos: vec2, color: sdl.Color) {
 // draws a non monospace font word
 draw_word :: proc(word: string, pos: vec2) {
     x_pos_count: f32 = 0
-    space_width := 32
 
     for char in word {
         if char == ' ' {
@@ -239,10 +234,9 @@ get_character_spacing :: proc() -> f32 {
 }
 
 draw_cursor :: proc() {
-    pos := to_world_space(globals.cursor_pos)
     rect := sdl.FRect {
-        x = (pos.x * get_character_spacing()) + BUFFER_PADDING,
-        y = (pos.y * get_line_height()) + BUFFER_PADDING - 3,
+        x = ((globals.cursor_pos.x * get_character_spacing()) + BUFFER_PADDING) - globals.viewport_offset.x,
+        y = ((globals.cursor_pos.y * get_line_height()) + BUFFER_PADDING - 3) - globals.viewport_offset.y,
         w = 4,
         h = get_line_height(),
     }
@@ -302,7 +296,7 @@ main :: proc() {
     ttf_init := ttf.Init(); assert(ttf_init)
     font = ttf.OpenFont("GeistMono-Regular.ttf", get_font_size())
     globals.glyph_map = generate_glyph_map()
-    load_buffer("test.txt")
+    load_buffer("main.odin")
     ok := sdl.StartTextInput(sdl_window)
     if !ok {
         fmt.println("[ERROR]: Failed to start text input")
@@ -324,5 +318,5 @@ main :: proc() {
         free_all(context.temp_allocator)
     }
 
-    unsaved_value := show_unsaved_changes_dialog()
+    // unsaved_value := show_unsaved_changes_dialog()
 }
