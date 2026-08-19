@@ -138,7 +138,17 @@ sdl_poll_events :: proc() {
                 }
             case .LEFT:
                 globals.cursor_pos.x -= 1
-                if globals.cursor_pos.x < 0 {
+
+                if keyboard.holding_cmd {
+                    globals.cursor_pos.x = 0
+                    for char, i in globals.active_buffer[globals.cursor_pos.y] {
+                        if char != ' ' {
+                            globals.cursor_pos.x = i
+                            break
+                        }
+                    }
+
+                } else if globals.cursor_pos.x < 0 {
                     if globals.cursor_pos.y - 1 >= 0 {
                         globals.cursor_pos.x = len(globals.active_buffer[int(globals.cursor_pos.y - 1)])
                         if globals.cursor_pos.y != 0 {
@@ -150,7 +160,10 @@ sdl_poll_events :: proc() {
                 }
             case .RIGHT:
                 globals.cursor_pos.x += 1
-                if globals.cursor_pos.x > len(globals.active_buffer[int(globals.cursor_pos.y)]) {
+
+                if keyboard.holding_cmd {
+                    globals.cursor_pos.x = len(globals.active_buffer[globals.cursor_pos.y])
+                } else if globals.cursor_pos.x > len(globals.active_buffer[int(globals.cursor_pos.y)]) {
                     globals.cursor_pos.x = 0
                     if globals.cursor_pos.y != len(globals.active_buffer) - 1 {
                         globals.cursor_pos.y += 1
