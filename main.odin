@@ -26,6 +26,13 @@ COLOR_BLACK :: sdl.Color{0, 0, 0, 255}
 BUFFER_PADDING :: 32
 GUTTER_PADDING :: 48
 
+Keyboard :: struct {
+    holding_shift: bool,
+    holding_ctrl:  bool,
+    holding_alt:   bool,
+    holding_cmd:   bool,
+}
+
 Globals :: struct {
     running:           bool,
     fps:               int,
@@ -40,6 +47,7 @@ Globals :: struct {
 globals := Globals {
     running = true,
 }
+keyboard: Keyboard
 sdl_window: ^sdl.Window
 sdl_renderer: ^sdl.Renderer
 font: ^ttf.Font
@@ -98,11 +106,17 @@ sdl_poll_events :: proc() {
             buffer_insert(fmt.tprint(event.text.text))
         case .KEY_DOWN:
             #partial switch event.key.scancode {
+            case .LGUI:
+                keyboard.holding_cmd = true
             case .BACKSPACE:
                 if globals.cursor_pos.x == 0 {
                     buffer_remove_line()
                 } else {
-                    buffer_remove_at_cursor()
+                    if keyboard.holding_cmd {
+                        buffer_remove_line_content()
+                    } else {
+                        buffer_remove_at_cursor()
+                    }
                 }
             case .RETURN:
                 buffer_insert_newline()
@@ -142,6 +156,12 @@ sdl_poll_events :: proc() {
                         globals.cursor_pos.y += 1
                     }
                 }
+            }
+
+        case .KEY_UP:
+            #partial switch event.key.scancode {
+            case .LGUI:
+                keyboard.holding_cmd = false
             }
         case .MOUSE_WHEEL:
             if event.wheel.y != 0 {
@@ -295,6 +315,13 @@ buffer_remove_line :: proc() {
         globals.cursor_pos.y -= 1
     }
     globals.cursor_pos.x = len(globals.active_buffer[globals.cursor_pos.y])
+}
+
+buffer_remove_line_content :: proc() {
+    current_line := globals.active_buffer[globals.cursor_pos.y]
+    text_beyond_cursor := current_line[globals.cursor_pos.x:]
+    globals.active_buffer[globals.cursor_pos.y] = text_beyond_cursor
+    globals.cursor_pos.x = 0
 }
 
 show_unsaved_changes_dialog :: proc() -> int {
