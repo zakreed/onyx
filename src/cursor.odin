@@ -6,6 +6,7 @@ CURSOR_BLINK_DURATION :: 0.5
 
 Cursor :: struct {
     pos:            vec2i,
+    desired_x:      int,
     blink_timer:    f32,
     visible:        bool,
     has_just_moved: bool,

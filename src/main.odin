@@ -16,7 +16,7 @@ FONT_SIZE :: 12
 LINE_HEIGHT :: 20
 CHARACTER_SPACING :: 8
 SCROLL_SPEED :: 200
-SCROLL_FRICTION :: 4
+SCROLL_FRICTION :: 10
 vec2 :: [2]f32
 vec2i :: [2]int
 
@@ -140,16 +140,22 @@ sdl_poll_events :: proc() {
                 if globals.cursor.pos.y > len(globals.active_buffer) - 1 {
                     cursor_move_abs(y = len(globals.active_buffer) - 1)
                 }
-                if len(globals.active_buffer[int(globals.cursor.pos.y)]) < int(globals.cursor.pos.x) {
+                if len(globals.active_buffer[int(globals.cursor.pos.y)]) < int(globals.cursor.desired_x) {
                     cursor_move_abs(x = len(globals.active_buffer[int(globals.cursor.pos.y)]))
+                } else {
+                    cursor_move_abs(x = globals.cursor.desired_x)
                 }
             case .UP:
                 cursor_move_rel(y = -1)
                 if globals.cursor.pos.y < 0 {
                     cursor_move_abs(y = 0)
                 }
-                if len(globals.active_buffer[int(globals.cursor.pos.y)]) < int(globals.cursor.pos.x) {
+
+                fmt.println(len(globals.active_buffer[int(globals.cursor.pos.y)]), globals.cursor.desired_x)
+                if len(globals.active_buffer[int(globals.cursor.pos.y)]) < globals.cursor.desired_x {
                     cursor_move_abs(x = len(globals.active_buffer[int(globals.cursor.pos.y)]))
+                } else {
+                    cursor_move_abs(x = globals.cursor.desired_x)
                 }
             case .LEFT:
                 cursor_move_rel(x = -1)
@@ -158,6 +164,7 @@ sdl_poll_events :: proc() {
                     for char, i in globals.active_buffer[globals.cursor.pos.y][:globals.cursor.pos.x + 1] {
                         if char != ' ' {
                             cursor_move_abs(x = i)
+                            globals.cursor.desired_x = globals.cursor.pos.x
                             return
                         }
                     }
@@ -173,9 +180,9 @@ sdl_poll_events :: proc() {
                         cursor_move_abs(x = 0)
                     }
                 }
+                globals.cursor.desired_x = globals.cursor.pos.x
             case .RIGHT:
                 cursor_move_rel(x = 1)
-
                 if keyboard.holding_cmd {
                     globals.cursor.pos.x = len(globals.active_buffer[globals.cursor.pos.y])
                 } else if globals.cursor.pos.x > len(globals.active_buffer[int(globals.cursor.pos.y)]) {
@@ -184,6 +191,7 @@ sdl_poll_events :: proc() {
                         cursor_move_rel(y = 1)
                     }
                 }
+                globals.cursor.desired_x = globals.cursor.pos.x
             }
 
         case .KEY_UP:
@@ -289,7 +297,6 @@ get_character_spacing :: proc() -> f32 {
     return CHARACTER_SPACING * sdl.GetWindowPixelDensity(sdl_window)
 }
 
-
 buffer_insert :: proc(char: string) {
     builder: strings.Builder
     current_line := globals.active_buffer[int(globals.cursor.pos.y)]
@@ -379,6 +386,8 @@ main :: proc() {
         sdl_poll_events()
         camera_update()
         cursor_update()
+
+        // fmt.println(globals.cursor.desired_x)
 
         sdl.SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255)
         sdl.RenderClear(sdl_renderer)
