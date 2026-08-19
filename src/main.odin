@@ -124,6 +124,7 @@ sdl_poll_events :: proc() {
             case .LGUI:
                 keyboard.holding_cmd = true
             case .BACKSPACE:
+                if globals.cursor.pos == 0 {return}
                 if globals.cursor.pos.x == 0 {
                     buffer_remove_line()
                 } else {
@@ -150,8 +151,6 @@ sdl_poll_events :: proc() {
                 if globals.cursor.pos.y < 0 {
                     cursor_move_abs(y = 0)
                 }
-
-                fmt.println(len(globals.active_buffer[int(globals.cursor.pos.y)]), globals.cursor.desired_x)
                 if len(globals.active_buffer[int(globals.cursor.pos.y)]) < globals.cursor.desired_x {
                     cursor_move_abs(x = len(globals.active_buffer[int(globals.cursor.pos.y)]))
                 } else {
@@ -307,7 +306,7 @@ buffer_insert :: proc(char: string) {
     strings.write_string(&builder, current_line[int(globals.cursor.pos.x):])
 
     globals.active_buffer[int(globals.cursor.pos.y)] = strings.to_string(builder)
-    globals.cursor.pos.x += 1
+    cursor_move_rel(x = 1)
 }
 
 buffer_remove_at_cursor :: proc() {
