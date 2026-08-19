@@ -91,6 +91,9 @@ camera_update :: proc() {
     if globals.viewport_offset.y < 0 {
         globals.viewport_offset.y = 0
     }
+    if globals.viewport_offset.y > f32(len(globals.active_buffer)) * get_line_height() {
+        globals.viewport_offset.y = f32(len(globals.active_buffer)) * get_line_height()
+    }
 
     globals.camera_scroll_vel.x = math.lerp(globals.camera_scroll_vel.x, f32(0), f32(SCROLL_FRICTION) * f32(globals.dt))
     globals.camera_scroll_vel.y = math.lerp(globals.camera_scroll_vel.y, f32(0), f32(SCROLL_FRICTION) * f32(globals.dt))
