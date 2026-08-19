@@ -18,6 +18,7 @@ CHARACTER_SPACING :: 8
 SCROLL_SPEED :: 200
 SCROLL_FRICTION :: 4
 vec2 :: [2]f32
+vec2i :: [2]int
 
 COLOR_WHITE :: sdl.Color{255, 255, 255, 255}
 COLOR_GRAY :: sdl.Color{128, 128, 128, 255}
@@ -32,8 +33,8 @@ Globals :: struct {
     glyph_map:         map[rune]^sdl.Texture,
     camera_scroll_vel: vec2,
     viewport_offset:   vec2,
-    cursor_pos:        vec2,
-    active_buffer:     []string,
+    cursor_pos:        vec2i,
+    active_buffer:     [dynamic]string,
 }
 
 globals := Globals {
@@ -56,7 +57,10 @@ calc_frame_info :: proc() {
 load_buffer :: proc(filename: string) {
     raw_file_data, load_ok := os.read_entire_file(filename, context.allocator)
     data := string(raw_file_data)
-    globals.active_buffer = strings.split_lines(data)
+    data_lines := strings.split_lines(data)
+    for line in data_lines {
+        append(&globals.active_buffer, line)
+    }
 }
 
 sdl_init :: proc() {
@@ -96,15 +100,15 @@ sdl_poll_events :: proc() {
             #partial switch event.key.scancode {
             case .BACKSPACE:
                 buffer_remove_at_cursor()
-            case .KP_ENTER:
-                buffer_insert("\n")
+            case .RETURN:
+                buffer_insert_newline()
             case .DOWN:
                 globals.cursor_pos.y += 1
-                if globals.cursor_pos.y > f32(len(globals.active_buffer) - 1) {
-                    globals.cursor_pos.y = f32(len(globals.active_buffer) - 1)
+                if globals.cursor_pos.y > len(globals.active_buffer) - 1 {
+                    globals.cursor_pos.y = len(globals.active_buffer) - 1
                 }
                 if len(globals.active_buffer[int(globals.cursor_pos.y)]) < int(globals.cursor_pos.x) {
-                    globals.cursor_pos.x = f32(len(globals.active_buffer[int(globals.cursor_pos.y)]))
+                    globals.cursor_pos.x = len(globals.active_buffer[int(globals.cursor_pos.y)])
                 }
             case .UP:
                 globals.cursor_pos.y -= 1
@@ -112,13 +116,13 @@ sdl_poll_events :: proc() {
                     globals.cursor_pos.y = 0
                 }
                 if len(globals.active_buffer[int(globals.cursor_pos.y)]) < int(globals.cursor_pos.x) {
-                    globals.cursor_pos.x = f32(len(globals.active_buffer[int(globals.cursor_pos.y)]))
+                    globals.cursor_pos.x = len(globals.active_buffer[int(globals.cursor_pos.y)])
                 }
             case .LEFT:
                 globals.cursor_pos.x -= 1
                 if globals.cursor_pos.x < 0 {
                     if globals.cursor_pos.y - 1 >= 0 {
-                        globals.cursor_pos.x = f32(len(globals.active_buffer[int(globals.cursor_pos.y - 1)]))
+                        globals.cursor_pos.x = len(globals.active_buffer[int(globals.cursor_pos.y - 1)])
                         if globals.cursor_pos.y != 0 {
                             globals.cursor_pos.y -= 1
                         }
@@ -128,9 +132,9 @@ sdl_poll_events :: proc() {
                 }
             case .RIGHT:
                 globals.cursor_pos.x += 1
-                if globals.cursor_pos.x > f32(len(globals.active_buffer[int(globals.cursor_pos.y)])) {
+                if globals.cursor_pos.x > len(globals.active_buffer[int(globals.cursor_pos.y)]) {
                     globals.cursor_pos.x = 0
-                    if globals.cursor_pos.y != f32(len(globals.active_buffer) - 1) {
+                    if globals.cursor_pos.y != len(globals.active_buffer) - 1 {
                         globals.cursor_pos.y += 1
                     }
                 }
@@ -235,8 +239,8 @@ get_character_spacing :: proc() -> f32 {
 
 draw_cursor :: proc() {
     rect := sdl.FRect {
-        x = ((globals.cursor_pos.x * get_character_spacing()) + BUFFER_PADDING) - globals.viewport_offset.x,
-        y = ((globals.cursor_pos.y * get_line_height()) + BUFFER_PADDING - 3) - globals.viewport_offset.y,
+        x = ((f32(globals.cursor_pos.x) * get_character_spacing()) + BUFFER_PADDING) - globals.viewport_offset.x,
+        y = ((f32(globals.cursor_pos.y) * get_line_height()) + BUFFER_PADDING - 3) - globals.viewport_offset.y,
         w = 4,
         h = get_line_height(),
     }
@@ -268,6 +272,17 @@ buffer_remove_at_cursor :: proc() {
 
     globals.active_buffer[int(globals.cursor_pos.y)] = strings.to_string(builder)
     globals.cursor_pos.x -= 1
+}
+
+buffer_insert_newline :: proc() {
+    current_line := globals.active_buffer[globals.cursor_pos.y]
+    text_before_cursor := current_line[:globals.cursor_pos.x]
+    text_beyond_cursor := current_line[globals.cursor_pos.x:]
+
+    globals.active_buffer[globals.cursor_pos.y] = text_before_cursor
+    inject_at(&globals.active_buffer, globals.cursor_pos.y + 1, text_beyond_cursor)
+    globals.cursor_pos.y += 1
+    globals.cursor_pos.x = 0
 }
 
 show_unsaved_changes_dialog :: proc() -> int {
@@ -318,5 +333,5 @@ main :: proc() {
         free_all(context.temp_allocator)
     }
 
-    // unsaved_value := show_unsaved_changes_dialog()
+    unsaved_value := show_unsaved_changes_dialog()
 }
