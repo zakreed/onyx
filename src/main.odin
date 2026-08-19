@@ -34,13 +34,13 @@ Keyboard :: struct {
 }
 
 Globals :: struct {
+    cursor:            Cursor,
     running:           bool,
     fps:               int,
-    dt:                f64,
+    dt:                f32,
     glyph_map:         map[rune]^sdl.Texture,
     camera_scroll_vel: vec2,
     viewport_offset:   vec2,
-    cursor_pos:        vec2i,
     active_buffer:     [dynamic]string,
 }
 
@@ -57,7 +57,7 @@ fps_timer_prev := sdl.GetPerformanceCounter()
 
 calc_frame_info :: proc() {
     fps_timer_now := sdl.GetPerformanceCounter()
-    globals.dt = (f64(fps_timer_now) - f64(fps_timer_prev)) / f64(sdl.GetPerformanceFrequency())
+    globals.dt = (f32(fps_timer_now - fps_timer_prev)) / f32(sdl.GetPerformanceFrequency())
     globals.fps = int(1 / globals.dt)
     fps_timer_prev = fps_timer_now
 }
@@ -109,22 +109,22 @@ sdl_poll_events :: proc() {
             buffer_insert(fmt.tprint(event.text.text))
             if event.text.text == fmt.ctprint('{') {
                 buffer_insert("}")
-                globals.cursor_pos.x -= 1
+                cursor_move_rel(x = -1)
             }
             if event.text.text == fmt.ctprint('(') {
                 buffer_insert(")")
-                globals.cursor_pos.x -= 1
+                cursor_move_rel(x = -1)
             }
             if event.text.text == fmt.ctprint('[') {
                 buffer_insert("]")
-                globals.cursor_pos.x -= 1
+                cursor_move_rel(x = -1)
             }
         case .KEY_DOWN:
             #partial switch event.key.scancode {
             case .LGUI:
                 keyboard.holding_cmd = true
             case .BACKSPACE:
-                if globals.cursor_pos.x == 0 {
+                if globals.cursor.pos.x == 0 {
                     buffer_remove_line()
                 } else {
                     if keyboard.holding_cmd {
@@ -136,52 +136,52 @@ sdl_poll_events :: proc() {
             case .RETURN:
                 buffer_insert_newline()
             case .DOWN:
-                globals.cursor_pos.y += 1
-                if globals.cursor_pos.y > len(globals.active_buffer) - 1 {
-                    globals.cursor_pos.y = len(globals.active_buffer) - 1
+                cursor_move_rel(y = 1)
+                if globals.cursor.pos.y > len(globals.active_buffer) - 1 {
+                    cursor_move_abs(y = len(globals.active_buffer) - 1)
                 }
-                if len(globals.active_buffer[int(globals.cursor_pos.y)]) < int(globals.cursor_pos.x) {
-                    globals.cursor_pos.x = len(globals.active_buffer[int(globals.cursor_pos.y)])
+                if len(globals.active_buffer[int(globals.cursor.pos.y)]) < int(globals.cursor.pos.x) {
+                    cursor_move_abs(x = len(globals.active_buffer[int(globals.cursor.pos.y)]))
                 }
             case .UP:
-                globals.cursor_pos.y -= 1
-                if globals.cursor_pos.y < 0 {
-                    globals.cursor_pos.y = 0
+                cursor_move_rel(y = -1)
+                if globals.cursor.pos.y < 0 {
+                    cursor_move_abs(y = 0)
                 }
-                if len(globals.active_buffer[int(globals.cursor_pos.y)]) < int(globals.cursor_pos.x) {
-                    globals.cursor_pos.x = len(globals.active_buffer[int(globals.cursor_pos.y)])
+                if len(globals.active_buffer[int(globals.cursor.pos.y)]) < int(globals.cursor.pos.x) {
+                    cursor_move_abs(x = len(globals.active_buffer[int(globals.cursor.pos.y)]))
                 }
             case .LEFT:
-                globals.cursor_pos.x -= 1
+                cursor_move_rel(x = -1)
 
                 if keyboard.holding_cmd {
-                    for char, i in globals.active_buffer[globals.cursor_pos.y][:globals.cursor_pos.x + 1] {
+                    for char, i in globals.active_buffer[globals.cursor.pos.y][:globals.cursor.pos.x + 1] {
                         if char != ' ' {
-                            globals.cursor_pos.x = i
+                            cursor_move_abs(x = i)
                             return
                         }
                     }
-                    globals.cursor_pos.x = 0
+                    cursor_move_abs(x = 0)
 
-                } else if globals.cursor_pos.x < 0 {
-                    if globals.cursor_pos.y - 1 >= 0 {
-                        globals.cursor_pos.x = len(globals.active_buffer[int(globals.cursor_pos.y - 1)])
-                        if globals.cursor_pos.y != 0 {
-                            globals.cursor_pos.y -= 1
+                } else if globals.cursor.pos.x < 0 {
+                    if globals.cursor.pos.y - 1 >= 0 {
+                        cursor_move_abs(x = len(globals.active_buffer[int(globals.cursor.pos.y - 1)]))
+                        if globals.cursor.pos.y != 0 {
+                            cursor_move_rel(y = -1)
                         }
                     } else {
-                        globals.cursor_pos.x = 0
+                        cursor_move_abs(x = 0)
                     }
                 }
             case .RIGHT:
-                globals.cursor_pos.x += 1
+                cursor_move_rel(x = 1)
 
                 if keyboard.holding_cmd {
-                    globals.cursor_pos.x = len(globals.active_buffer[globals.cursor_pos.y])
-                } else if globals.cursor_pos.x > len(globals.active_buffer[int(globals.cursor_pos.y)]) {
-                    globals.cursor_pos.x = 0
-                    if globals.cursor_pos.y != len(globals.active_buffer) - 1 {
-                        globals.cursor_pos.y += 1
+                    globals.cursor.pos.x = len(globals.active_buffer[globals.cursor.pos.y])
+                } else if globals.cursor.pos.x > len(globals.active_buffer[int(globals.cursor.pos.y)]) {
+                    cursor_move_abs(x = 0)
+                    if globals.cursor.pos.y != len(globals.active_buffer) - 1 {
+                        cursor_move_rel(y = 1)
                     }
                 }
             }
@@ -289,67 +289,58 @@ get_character_spacing :: proc() -> f32 {
     return CHARACTER_SPACING * sdl.GetWindowPixelDensity(sdl_window)
 }
 
-draw_cursor :: proc() {
-    rect := sdl.FRect {
-        x = ((f32(globals.cursor_pos.x) * get_character_spacing()) + BUFFER_PADDING) - globals.viewport_offset.x,
-        y = ((f32(globals.cursor_pos.y) * get_line_height()) + BUFFER_PADDING - 3) - globals.viewport_offset.y,
-        w = 2,
-        h = get_line_height(),
-    }
-    sdl.RenderFillRect(sdl_renderer, &rect)
-}
 
 buffer_insert :: proc(char: string) {
     builder: strings.Builder
-    current_line := globals.active_buffer[int(globals.cursor_pos.y)]
+    current_line := globals.active_buffer[int(globals.cursor.pos.y)]
 
     strings.builder_init(&builder)
-    strings.write_string(&builder, current_line[:int(globals.cursor_pos.x)])
+    strings.write_string(&builder, current_line[:int(globals.cursor.pos.x)])
     strings.write_string(&builder, char)
-    strings.write_string(&builder, current_line[int(globals.cursor_pos.x):])
+    strings.write_string(&builder, current_line[int(globals.cursor.pos.x):])
 
-    globals.active_buffer[int(globals.cursor_pos.y)] = strings.to_string(builder)
-    globals.cursor_pos.x += 1
+    globals.active_buffer[int(globals.cursor.pos.y)] = strings.to_string(builder)
+    globals.cursor.pos.x += 1
 }
 
 buffer_remove_at_cursor :: proc() {
-    if globals.cursor_pos.x == 0 {return}
+    if globals.cursor.pos.x == 0 {return}
 
     builder: strings.Builder
-    current_line := globals.active_buffer[int(globals.cursor_pos.y)]
+    current_line := globals.active_buffer[int(globals.cursor.pos.y)]
 
     strings.builder_init(&builder)
-    strings.write_string(&builder, current_line[:int(globals.cursor_pos.x) - 1])
-    strings.write_string(&builder, current_line[int(globals.cursor_pos.x):])
+    strings.write_string(&builder, current_line[:int(globals.cursor.pos.x) - 1])
+    strings.write_string(&builder, current_line[int(globals.cursor.pos.x):])
 
-    globals.active_buffer[int(globals.cursor_pos.y)] = strings.to_string(builder)
-    globals.cursor_pos.x -= 1
+    globals.active_buffer[int(globals.cursor.pos.y)] = strings.to_string(builder)
+    cursor_move_rel(x = -1)
 }
 
 buffer_insert_newline :: proc() {
-    current_line := globals.active_buffer[globals.cursor_pos.y]
-    text_before_cursor := current_line[:globals.cursor_pos.x]
-    text_beyond_cursor := current_line[globals.cursor_pos.x:]
+    current_line := globals.active_buffer[globals.cursor.pos.y]
+    text_before_cursor := current_line[:globals.cursor.pos.x]
+    text_beyond_cursor := current_line[globals.cursor.pos.x:]
 
-    globals.active_buffer[globals.cursor_pos.y] = text_before_cursor
-    inject_at(&globals.active_buffer, globals.cursor_pos.y + 1, text_beyond_cursor)
-    globals.cursor_pos.y += 1
-    globals.cursor_pos.x = 0
+    globals.active_buffer[globals.cursor.pos.y] = text_before_cursor
+    inject_at(&globals.active_buffer, globals.cursor.pos.y + 1, text_beyond_cursor)
+    cursor_move_rel(y = 1)
+    cursor_move_abs(x = 0)
 }
 
 buffer_remove_line :: proc() {
-    ordered_remove(&globals.active_buffer, globals.cursor_pos.y)
-    if globals.cursor_pos.y != 0 {
-        globals.cursor_pos.y -= 1
+    ordered_remove(&globals.active_buffer, globals.cursor.pos.y)
+    if globals.cursor.pos.y != 0 {
+        globals.cursor.pos.y -= 1
     }
-    globals.cursor_pos.x = len(globals.active_buffer[globals.cursor_pos.y])
+    cursor_move_abs(x = len(globals.active_buffer[globals.cursor.pos.y]))
 }
 
 buffer_remove_line_content :: proc() {
-    current_line := globals.active_buffer[globals.cursor_pos.y]
-    text_beyond_cursor := current_line[globals.cursor_pos.x:]
-    globals.active_buffer[globals.cursor_pos.y] = text_beyond_cursor
-    globals.cursor_pos.x = 0
+    current_line := globals.active_buffer[globals.cursor.pos.y]
+    text_beyond_cursor := current_line[globals.cursor.pos.x:]
+    globals.active_buffer[globals.cursor.pos.y] = text_beyond_cursor
+    cursor_move_abs(x = 0)
 }
 
 show_unsaved_changes_dialog :: proc() -> int {
@@ -378,7 +369,7 @@ main :: proc() {
     ttf_init := ttf.Init(); assert(ttf_init)
     font = ttf.OpenFont("GeistMono-Regular.ttf", get_font_size())
     globals.glyph_map = generate_glyph_map()
-    load_buffer("main.odin")
+    load_buffer("src/main.odin")
     ok := sdl.StartTextInput(sdl_window)
     if !ok {
         fmt.println("[ERROR]: Failed to start text input")
@@ -387,13 +378,14 @@ main :: proc() {
     for (globals.running) {
         sdl_poll_events()
         camera_update()
+        cursor_update()
 
         sdl.SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255)
         sdl.RenderClear(sdl_renderer)
         draw_buffer()
 
         sdl.SetRenderDrawColor(sdl_renderer, 255, 255, 255, 255)
-        draw_cursor()
+        cursor_draw()
 
         sdl.RenderPresent(sdl_renderer)
         calc_frame_info()

@@ -1,15 +1,15 @@
 .PHONY: all
 
 all:
-	odin build . -out:editor
+	odin build ./src -out:editor
 	./editor
 
 release:
-	odin build . -o:speed -out:editor
+	odin build ./src -o:speed -out:editor
 
 windows:
-	odin build . -out:editor.exe -subsystem:windows
+	odin build ./src -out:editor.exe -subsystem:windows
 
 
 release_windows:
-	odin build . -out:editor.exe -subsystem:windows -o:speed
+	odin build ./src -out:editor.exe -subsystem:windows -o:speed
