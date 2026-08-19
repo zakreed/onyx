@@ -99,7 +99,11 @@ sdl_poll_events :: proc() {
         case .KEY_DOWN:
             #partial switch event.key.scancode {
             case .BACKSPACE:
-                buffer_remove_at_cursor()
+                if globals.cursor_pos.x == 0 {
+                    buffer_remove_line()
+                } else {
+                    buffer_remove_at_cursor()
+                }
             case .RETURN:
                 buffer_insert_newline()
             case .DOWN:
@@ -283,6 +287,14 @@ buffer_insert_newline :: proc() {
     inject_at(&globals.active_buffer, globals.cursor_pos.y + 1, text_beyond_cursor)
     globals.cursor_pos.y += 1
     globals.cursor_pos.x = 0
+}
+
+buffer_remove_line :: proc() {
+    ordered_remove(&globals.active_buffer, globals.cursor_pos.y)
+    if globals.cursor_pos.y != 0 {
+        globals.cursor_pos.y -= 1
+    }
+    globals.cursor_pos.x = len(globals.active_buffer[globals.cursor_pos.y])
 }
 
 show_unsaved_changes_dialog :: proc() -> int {
