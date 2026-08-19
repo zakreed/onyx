@@ -107,6 +107,18 @@ sdl_poll_events :: proc() {
             globals.running = false
         case .TEXT_INPUT:
             buffer_insert(fmt.tprint(event.text.text))
+            if event.text.text == fmt.ctprint('{') {
+                buffer_insert("}")
+                globals.cursor_pos.x -= 1
+            }
+            if event.text.text == fmt.ctprint('(') {
+                buffer_insert(")")
+                globals.cursor_pos.x -= 1
+            }
+            if event.text.text == fmt.ctprint('[') {
+                buffer_insert("]")
+                globals.cursor_pos.x -= 1
+            }
         case .KEY_DOWN:
             #partial switch event.key.scancode {
             case .LGUI:
@@ -281,7 +293,7 @@ draw_cursor :: proc() {
     rect := sdl.FRect {
         x = ((f32(globals.cursor_pos.x) * get_character_spacing()) + BUFFER_PADDING) - globals.viewport_offset.x,
         y = ((f32(globals.cursor_pos.y) * get_line_height()) + BUFFER_PADDING - 3) - globals.viewport_offset.y,
-        w = 4,
+        w = 2,
         h = get_line_height(),
     }
     sdl.RenderFillRect(sdl_renderer, &rect)
