@@ -140,13 +140,13 @@ sdl_poll_events :: proc() {
                 globals.cursor_pos.x -= 1
 
                 if keyboard.holding_cmd {
-                    globals.cursor_pos.x = 0
-                    for char, i in globals.active_buffer[globals.cursor_pos.y] {
+                    for char, i in globals.active_buffer[globals.cursor_pos.y][:globals.cursor_pos.x + 1] {
                         if char != ' ' {
                             globals.cursor_pos.x = i
-                            break
+                            return
                         }
                     }
+                    globals.cursor_pos.x = 0
 
                 } else if globals.cursor_pos.x < 0 {
                     if globals.cursor_pos.y - 1 >= 0 {
