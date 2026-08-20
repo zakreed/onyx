@@ -258,8 +258,8 @@ draw_text :: proc(text: string, pos: vec2, color: sdl.Color) {
         w, h: f32
         sdl.GetTextureSize(texture, &w, &h)
         dst := sdl.FRect {
-            x = pos.x - globals.viewport_offset.x,
-            y = pos.y - globals.viewport_offset.y,
+            x = math.round(pos.x - globals.viewport_offset.x),
+            y = math.round(pos.y - globals.viewport_offset.y),
             w = w,
             h = h,
         }
