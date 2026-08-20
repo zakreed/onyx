@@ -55,6 +55,10 @@ bg_color := sdl.Color{255, 255, 255, 255}
 font_color := sdl.Color{0, 0, 0, 255}
 fps_timer_prev := sdl.GetPerformanceCounter()
 
+screen_to_world_pos :: proc(pos: vec2) -> vec2 {
+    return pos + globals.viewport_offset
+}
+
 calc_frame_info :: proc() {
     fps_timer_now := sdl.GetPerformanceCounter()
     globals.dt = (f32(fps_timer_now - fps_timer_prev)) / f32(sdl.GetPerformanceFrequency())
@@ -201,6 +205,24 @@ sdl_poll_events :: proc() {
         case .MOUSE_WHEEL:
             if event.wheel.y != 0 {
                 globals.camera_scroll_vel.y -= event.wheel.y * SCROLL_SPEED
+            }
+        case .MOUSE_BUTTON_DOWN:
+            if event.button.button == 1 {
+                pos := screen_to_world_pos({event.button.x, event.button.y})
+                line_number := int(math.floor((pos.y - BUFFER_PADDING) / LINE_HEIGHT))
+                col_number := int(math.floor(pos.x - BUFFER_PADDING) / get_character_spacing())
+
+                if line_number >= len(globals.active_buffer) {
+                    cursor_move_abs(y = len(globals.active_buffer) - 1)
+                } else if line_number >= 0 {
+                    cursor_move_abs(y = line_number)
+                }
+
+                if col_number >= len(globals.active_buffer[globals.cursor.pos.y]) {
+                    cursor_move_abs(x = len(globals.active_buffer[globals.cursor.pos.y]))
+                } else if col_number >= 0 {
+                    cursor_move_abs(x = col_number)
+                }
             }
         }
     }
