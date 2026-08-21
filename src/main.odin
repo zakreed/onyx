@@ -1,5 +1,7 @@
 package main
 
+import ts "../vendor/tree-sitter-odin"
+import ts_odin "../vendor/tree-sitter-odin/parsers/odin"
 import "core:fmt"
 import "core:math"
 import "core:os"
@@ -35,6 +37,24 @@ Keyboard :: struct {
     holding_cmd:   bool,
 }
 
+TreesitterCapture :: struct {
+    start_byte: u32,
+    end_byte:   u32,
+    token:      string,
+    type:       string,
+}
+
+Treesitter :: struct {
+    source:         string,
+    tree:           ts.Tree,
+    root:           ts.Node,
+    query:          ts.Query,
+    cursor:         ts.Query_Cursor,
+    outdated:       bool,
+    data:           [dynamic]TreesitterCapture,
+    char_type_list: [dynamic]string,
+}
+
 Globals :: struct {
     cursor:               Cursor,
     running:              bool,
@@ -45,6 +65,7 @@ Globals :: struct {
     viewport_offset:      vec2,
     active_buffer:        [dynamic]string,
     active_buffer_bounds: vec2i,
+    treesitter:           Treesitter,
 }
 
 globals := Globals {
@@ -85,6 +106,22 @@ sdl_init :: proc() {
     assert(sdl_window != nil)
     assert(sdl_renderer != nil)
     assert(ok_vsync)
+}
+
+// TODO: Deduce language to use instead of hard coding it to odin
+treesitter_init :: proc() {
+    parser := ts.parser_new()
+    odin_lang := ts_odin.tree_sitter_odin()
+    ts.parser_set_language(parser, odin_lang)
+    raw_file_data, load_ok := os.read_entire_file("src/main.odin", context.allocator)
+    source := string(raw_file_data)
+    globals.treesitter.source = source
+    globals.treesitter.tree = ts.parser_parse_string(parser, source)
+    globals.treesitter.root = ts.tree_root_node(globals.treesitter.tree)
+    query, _, _ := ts.query_new(odin_lang, ts_odin.HIGHLIGHTS)
+    globals.treesitter.query = query
+    globals.treesitter.cursor = ts.query_cursor_new()
+    globals.treesitter.outdated = true
 }
 
 camera_update :: proc() {
@@ -279,6 +316,8 @@ draw_text :: proc(text: string, pos: vec2, color: sdl.Color) {
             w = w,
             h = h,
         }
+        sdl.SetTextureColorMod(texture, color.r, color.g, color.b)
+        sdl.SetTextureAlphaMod(texture, color.a)
         sdl.RenderTexture(sdl_renderer, texture, nil, &dst)
     }
 }
@@ -296,7 +335,6 @@ draw_word :: proc(word: string, pos: vec2) {
         texture := globals.glyph_map[char]
         w, h: f32
         sdl.GetTextureSize(texture, &w, &h)
-        fmt.println(w, h)
         dst := sdl.FRect {
             x = pos.x + x_pos_count - globals.viewport_offset.x,
             y = pos.y - globals.viewport_offset.y,
@@ -308,17 +346,77 @@ draw_word :: proc(word: string, pos: vec2) {
     }
 }
 
+get_char_color :: proc(index: int, char: rune, line_num: int) -> sdl.Color {
+    type: string
+    for token in globals.treesitter.data {
+        if index >= int(token.start_byte) && index <= int(token.end_byte) {
+            type = token.type
+        }
+    }
+
+    switch type {
+    case "include":
+        return sdl.Color{232, 59, 59, 255}
+    case "variable":
+    case "namespace":
+        return sdl.Color{255, 255, 255, 255}
+    case "string":
+        return sdl.Color{30, 188, 115, 255}
+    case "type":
+        return sdl.Color{249, 194, 43, 255}
+    case "function.call":
+        return sdl.Color{77, 155, 230, 255}
+    }
+    return sdl.Color{255, 255, 255, 255}
+}
+
+generate_treesitter_color_list :: proc() {
+    ts.query_cursor_exec(globals.treesitter.cursor, globals.treesitter.query, globals.treesitter.root)
+    for match, cap_idx in ts.query_cursor_next_capture(globals.treesitter.cursor) {
+        cap := match.captures[cap_idx]
+        if len(ts.query_predicates_for_pattern(globals.treesitter.query, u32(match.pattern_index))) > 0 {
+            continue
+        }
+
+        append(
+            &globals.treesitter.data,
+            TreesitterCapture {
+                start_byte = ts.node_start_byte(cap.node),
+                end_byte = ts.node_end_byte(cap.node),
+                token = ts.node_text(cap.node, globals.treesitter.source),
+                type = ts.query_capture_name_for_id(globals.treesitter.query, cap.index),
+            },
+        )
+    }
+    for token_pair, i in globals.treesitter.data {
+        for char in token_pair.token {
+            append(&globals.treesitter.char_type_list, token_pair.type)
+        }
+    }
+}
+
 draw_buffer :: proc() {
+    if globals.treesitter.outdated {
+        generate_treesitter_color_list()
+        globals.treesitter.outdated = false
+    }
+
+    char_byte := 0
     for line, i in globals.active_buffer {
         // draw_text(fmt.tprint(i), {CHARACTER_SPACING + BUFFER_PADDING, f32(i * LINE_HEIGHT) + BUFFER_PADDING}, COLOR_GRAY)
         for char, j in line {
             char_str := utf8.runes_to_string({char}, context.temp_allocator)
+            color := get_char_color(char_byte, char, i)
             draw_text(
                 char_str,
                 {f32(j) * get_character_spacing() + BUFFER_PADDING, f32(i) * get_line_height() + BUFFER_PADDING},
-                COLOR_WHITE,
+                color,
             )
+
+            char_byte += 1
         }
+        // increment for newline character
+        char_byte += 1
     }
 }
 
@@ -418,6 +516,7 @@ main :: proc() {
     if !ok {
         fmt.println("[ERROR]: Failed to start text input")
     }
+    treesitter_init()
 
     for (globals.running) {
         sdl_poll_events()
@@ -437,5 +536,5 @@ main :: proc() {
         free_all(context.temp_allocator)
     }
 
-    unsaved_value := show_unsaved_changes_dialog()
+    // unsaved_value := show_unsaved_changes_dialog()
 }
