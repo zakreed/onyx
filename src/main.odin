@@ -282,7 +282,7 @@ sdl_poll_events :: proc() {
 }
 
 generate_glyph_map :: proc() -> map[rune]^sdl.Texture {
-    glyphs_to_generate := "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"£$%^&*()-_=+[]{};:'@#~,./<>?\\|¬"
+    glyphs_to_generate := "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"£$%^&*()-_=+[]{};:'@#~,./<>?\\|"
     glyph_map := map[rune]^sdl.Texture{}
 
     for glyph in glyphs_to_generate {
@@ -413,7 +413,7 @@ draw_buffer :: proc() {
                 color,
             )
 
-            char_byte += 1
+            char_byte += utf8.rune_size(char)
         }
         // increment for newline character
         char_byte += 1
