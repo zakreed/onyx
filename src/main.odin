@@ -15,6 +15,7 @@ SCREEN_MIN_HEIGHT :: 9 * 25
 FONT_SIZE :: 12
 LINE_HEIGHT :: 20
 CHARACTER_SPACING :: 8
+TAB_WIDTH :: 4
 SCROLL_SPEED :: 200
 SCROLL_FRICTION :: 10
 SCROLL_MARGIN :: 3
@@ -123,6 +124,10 @@ sdl_poll_events :: proc() {
             }
         case .KEY_DOWN:
             #partial switch event.key.scancode {
+            case .TAB:
+                for i in 0 ..< TAB_WIDTH {
+                    buffer_insert(" ")
+                }
             case .LGUI:
                 keyboard.holding_cmd = true
             case .BACKSPACE:
