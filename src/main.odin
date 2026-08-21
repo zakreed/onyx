@@ -143,6 +143,19 @@ sdl_poll_events :: proc() {
                 }
             case .RETURN:
                 buffer_insert_newline()
+                if globals.cursor.pos != 0 {
+                    spaces_before_content_on_prev_line := 0
+                    for char in globals.active_buffer[globals.cursor.pos.y - 1] {
+                        if char == ' ' {
+                            spaces_before_content_on_prev_line += 1
+                        } else {
+                            break
+                        }
+                    }
+                    for i in 0 ..< spaces_before_content_on_prev_line {
+                        buffer_insert(" ")
+                    }
+                }
             case .DOWN:
                 cursor_move_rel(y = 1)
                 if globals.cursor.pos.y > i32(len(globals.active_buffer)) - 1 {
