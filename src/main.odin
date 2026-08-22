@@ -1,12 +1,9 @@
 package main
 
-import ts "../vendor/tree-sitter-odin"
-import ts_odin "../vendor/tree-sitter-odin/parsers/odin"
 import "core:fmt"
 import "core:math"
 import "core:os"
 import "core:strings"
-import "core:unicode/utf8"
 import sdl "vendor:sdl3"
 import ttf "vendor:sdl3/ttf"
 
@@ -42,17 +39,6 @@ TreesitterCapture :: struct {
     end_byte:   u32,
     token:      string,
     type:       string,
-}
-
-Treesitter :: struct {
-    source:        string,
-    tree:          ts.Tree,
-    root:          ts.Node,
-    query:         ts.Query,
-    cursor:        ts.Query_Cursor,
-    outdated:      bool,
-    data:          [dynamic]TreesitterCapture,
-    char_type_map: map[int]string,
 }
 
 Globals :: struct {
@@ -106,22 +92,6 @@ sdl_init :: proc() {
     assert(sdl_window != nil)
     assert(sdl_renderer != nil)
     assert(ok_vsync)
-}
-
-// TODO: Deduce language to use instead of hard coding it to odin
-treesitter_init :: proc() {
-    parser := ts.parser_new()
-    odin_lang := ts_odin.tree_sitter_odin()
-    ts.parser_set_language(parser, odin_lang)
-    raw_file_data, load_ok := os.read_entire_file("src/main.odin", context.allocator)
-    source := string(raw_file_data)
-    globals.treesitter.source = source
-    globals.treesitter.tree = ts.parser_parse_string(parser, source)
-    globals.treesitter.root = ts.tree_root_node(globals.treesitter.tree)
-    query, _, _ := ts.query_new(odin_lang, ts_odin.HIGHLIGHTS)
-    globals.treesitter.query = query
-    globals.treesitter.cursor = ts.query_cursor_new()
-    globals.treesitter.outdated = true
 }
 
 camera_update :: proc() {
@@ -281,47 +251,6 @@ sdl_poll_events :: proc() {
     }
 }
 
-generate_glyph_map :: proc() -> map[rune]^sdl.Texture {
-    glyphs_to_generate := "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"£$%^&*()-_=+[]{};:'@#~,./<>?\\|"
-    glyph_map := map[rune]^sdl.Texture{}
-
-    for glyph in glyphs_to_generate {
-        crune := fmt.ctprint(glyph)
-        text := ttf.RenderText_Blended(font, crune, 0, COLOR_WHITE)
-        texture := sdl.CreateTextureFromSurface(sdl_renderer, text)
-        if texture == nil {
-            fmt.println("Failed to create texture for glyph", glyph)
-        }
-        glyph_map[glyph] = texture
-    }
-
-    return glyph_map
-}
-
-destroy_glyph_map :: proc() {
-    for key in globals.glyph_map {
-        sdl.DestroyTexture(globals.glyph_map[key])
-    }
-    delete(globals.glyph_map)
-}
-
-draw_text :: proc(text: string, pos: vec2, color: sdl.Color) {
-    for char in text {
-        texture := globals.glyph_map[char]
-        w, h: f32
-        sdl.GetTextureSize(texture, &w, &h)
-        dst := sdl.FRect {
-            x = math.round(pos.x - globals.viewport_offset.x),
-            y = math.round(pos.y - globals.viewport_offset.y),
-            w = w,
-            h = h,
-        }
-        sdl.SetTextureColorMod(texture, color.r, color.g, color.b)
-        sdl.SetTextureAlphaMod(texture, color.a)
-        sdl.RenderTexture(sdl_renderer, texture, nil, &dst)
-    }
-}
-
 // draws a non monospace font word
 draw_word :: proc(word: string, pos: vec2) {
     x_pos_count: f32 = 0
@@ -346,95 +275,6 @@ draw_word :: proc(word: string, pos: vec2) {
     }
 }
 
-get_char_color :: proc(index: int, char: rune, line_num: int) -> sdl.Color {
-    type := globals.treesitter.char_type_map[index]
-    switch type {
-    case "include":
-        return sdl.Color{232, 59, 59, 255}
-    case "variable":
-    case "punctuation.delimiter":
-    case "namespace":
-        return sdl.Color{255, 255, 255, 255}
-    case "string":
-        return sdl.Color{30, 188, 115, 255}
-    case "type":
-        return sdl.Color{249, 194, 43, 255}
-    case "operator":
-        return sdl.Color{143, 211, 255, 255}
-    case "function.call":
-        return sdl.Color{77, 155, 230, 255}
-    case "number":
-        return sdl.Color{234, 173, 237, 255}
-    case "punctuation.bracket":
-        return sdl.Color{199, 220, 208, 255}
-    case "comment":
-    case "spell":
-        return sdl.Color{98, 85, 101, 255}
-    case "keyword.function":
-    case "keyword.return":
-    case "keyword.for":
-        return sdl.Color{195, 36, 84, 255}
-    }
-    return sdl.Color{255, 255, 255, 255}
-}
-
-generate_treesitter_color_list :: proc() {
-    ts.query_cursor_exec(globals.treesitter.cursor, globals.treesitter.query, globals.treesitter.root)
-    for match, cap_idx in ts.query_cursor_next_capture(globals.treesitter.cursor) {
-        cap := match.captures[cap_idx]
-        if len(ts.query_predicates_for_pattern(globals.treesitter.query, u32(match.pattern_index))) > 0 {
-            continue
-        }
-
-        append(
-            &globals.treesitter.data,
-            TreesitterCapture {
-                start_byte = ts.node_start_byte(cap.node),
-                end_byte = ts.node_end_byte(cap.node),
-                token = ts.node_text(cap.node, globals.treesitter.source),
-                type = ts.query_capture_name_for_id(globals.treesitter.query, cap.index),
-            },
-        )
-    }
-
-    for capture in globals.treesitter.data {
-        for byte_index in capture.start_byte ..< capture.end_byte {
-            globals.treesitter.char_type_map[int(byte_index)] = capture.type
-        }
-    }
-}
-
-draw_buffer :: proc() {
-    if globals.treesitter.outdated {
-        generate_treesitter_color_list()
-        globals.treesitter.outdated = false
-    }
-
-    start_draw_line := i32(globals.viewport_offset.y / get_line_height())
-    end_draw_line :=
-        (globals.active_buffer_bounds.y) / i32(get_line_height()) + i32(globals.viewport_offset.y / get_line_height())
-
-    char_byte := 0
-    for line, i in globals.active_buffer {
-        if i32(i) < start_draw_line || i32(i) > end_draw_line {
-            char_byte += len(line) + 1
-            continue
-        }
-        for char, j in line {
-            char_str := utf8.runes_to_string({char}, context.temp_allocator)
-            color := get_char_color(char_byte, char, i)
-            draw_text(
-                char_str,
-                {f32(j) * get_character_spacing() + BUFFER_PADDING, f32(i) * get_line_height() + BUFFER_PADDING},
-                color,
-            )
-            char_byte += utf8.rune_size(char)
-        }
-        // increment for newline character
-        char_byte += 1
-    }
-}
-
 get_font_size :: proc() -> f32 {
     return FONT_SIZE * sdl.GetWindowPixelDensity(sdl_window)
 }
@@ -445,59 +285,6 @@ get_line_height :: proc() -> f32 {
 
 get_character_spacing :: proc() -> f32 {
     return CHARACTER_SPACING * sdl.GetWindowPixelDensity(sdl_window)
-}
-
-buffer_insert :: proc(char: string) {
-    builder: strings.Builder
-    current_line := globals.active_buffer[int(globals.cursor.pos.y)]
-
-    strings.builder_init(&builder)
-    strings.write_string(&builder, current_line[:int(globals.cursor.pos.x)])
-    strings.write_string(&builder, char)
-    strings.write_string(&builder, current_line[int(globals.cursor.pos.x):])
-
-    globals.active_buffer[int(globals.cursor.pos.y)] = strings.to_string(builder)
-    cursor_move_rel(x = 1)
-}
-
-buffer_remove_at_cursor :: proc() {
-    if globals.cursor.pos.x == 0 {return}
-
-    builder: strings.Builder
-    current_line := globals.active_buffer[int(globals.cursor.pos.y)]
-
-    strings.builder_init(&builder)
-    strings.write_string(&builder, current_line[:int(globals.cursor.pos.x) - 1])
-    strings.write_string(&builder, current_line[int(globals.cursor.pos.x):])
-
-    globals.active_buffer[int(globals.cursor.pos.y)] = strings.to_string(builder)
-    cursor_move_rel(x = -1)
-}
-
-buffer_insert_newline :: proc() {
-    current_line := globals.active_buffer[globals.cursor.pos.y]
-    text_before_cursor := current_line[:globals.cursor.pos.x]
-    text_beyond_cursor := current_line[globals.cursor.pos.x:]
-
-    globals.active_buffer[globals.cursor.pos.y] = text_before_cursor
-    inject_at(&globals.active_buffer, globals.cursor.pos.y + 1, text_beyond_cursor)
-    cursor_move_rel(y = 1)
-    cursor_move_abs(x = 0)
-}
-
-buffer_remove_line :: proc() {
-    ordered_remove(&globals.active_buffer, globals.cursor.pos.y)
-    if globals.cursor.pos.y != 0 {
-        globals.cursor.pos.y -= 1
-    }
-    cursor_move_abs(x = i32(len(globals.active_buffer[globals.cursor.pos.y])))
-}
-
-buffer_remove_line_content :: proc() {
-    current_line := globals.active_buffer[globals.cursor.pos.y]
-    text_beyond_cursor := current_line[globals.cursor.pos.x:]
-    globals.active_buffer[globals.cursor.pos.y] = text_beyond_cursor
-    cursor_move_abs(x = 0)
 }
 
 show_unsaved_changes_dialog :: proc() -> int {
@@ -525,7 +312,7 @@ main :: proc() {
     sdl_init()
     ttf_init := ttf.Init(); assert(ttf_init)
     font = ttf.OpenFont("GeistMono-Regular.ttf", get_font_size())
-    globals.glyph_map = generate_glyph_map()
+    globals.glyph_map = glyph_map_new()
     load_buffer("src/main.odin")
     ok := sdl.StartTextInput(sdl_window)
     if !ok {
@@ -541,7 +328,7 @@ main :: proc() {
 
         sdl.SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255)
         sdl.RenderClear(sdl_renderer)
-        draw_buffer()
+        buffer_draw()
 
         sdl.SetRenderDrawColor(sdl_renderer, 255, 255, 255, 255)
         cursor_draw()
