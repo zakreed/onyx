@@ -45,14 +45,14 @@ TreesitterCapture :: struct {
 }
 
 Treesitter :: struct {
-    source:         string,
-    tree:           ts.Tree,
-    root:           ts.Node,
-    query:          ts.Query,
-    cursor:         ts.Query_Cursor,
-    outdated:       bool,
-    data:           [dynamic]TreesitterCapture,
-    char_type_list: [dynamic]string,
+    source:        string,
+    tree:          ts.Tree,
+    root:          ts.Node,
+    query:         ts.Query,
+    cursor:        ts.Query_Cursor,
+    outdated:      bool,
+    data:          [dynamic]TreesitterCapture,
+    char_type_map: map[int]string,
 }
 
 Globals :: struct {
@@ -347,7 +347,7 @@ draw_word :: proc(word: string, pos: vec2) {
 }
 
 get_char_color :: proc(index: int, char: rune, line_num: int) -> sdl.Color {
-    type := globals.treesitter.char_type_list[index]
+    type := globals.treesitter.char_type_map[index]
     switch type {
     case "include":
         return sdl.Color{232, 59, 59, 255}
@@ -375,7 +375,6 @@ get_char_color :: proc(index: int, char: rune, line_num: int) -> sdl.Color {
     case "keyword.for":
         return sdl.Color{195, 36, 84, 255}
     }
-
     return sdl.Color{255, 255, 255, 255}
 }
 
@@ -397,9 +396,10 @@ generate_treesitter_color_list :: proc() {
             },
         )
     }
-    for token_pair, i in globals.treesitter.data {
-        for char in token_pair.token {
-            append(&globals.treesitter.char_type_list, token_pair.type)
+
+    for capture in globals.treesitter.data {
+        for byte_index in capture.start_byte ..< capture.end_byte {
+            globals.treesitter.char_type_map[int(byte_index)] = capture.type
         }
     }
 }
@@ -416,7 +416,10 @@ draw_buffer :: proc() {
 
     char_byte := 0
     for line, i in globals.active_buffer {
-        if i32(i) < start_draw_line || i32(i) > end_draw_line {continue}
+        if i32(i) < start_draw_line || i32(i) > end_draw_line {
+            char_byte += len(line) + 1
+            continue
+        }
         for char, j in line {
             char_str := utf8.runes_to_string({char}, context.temp_allocator)
             color := get_char_color(char_byte, char, i)
