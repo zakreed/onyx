@@ -56,18 +56,16 @@ Treesitter :: struct {
 }
 
 Globals :: struct {
-    cursor:                     Cursor,
-    running:                    bool,
-    fps:                        int,
-    dt:                         f32,
-    glyph_map:                  map[rune]^sdl.Texture,
-    camera_scroll_vel:          vec2,
-    viewport_offset:            vec2,
-    active_buffer:              [dynamic]string,
-    active_buffer_bounds:       vec2i,
-    treesitter:                 Treesitter,
-    lines_to_redraw_this_frame: [dynamic]int,
-    chars_per_line:             [dynamic]int,
+    cursor:               Cursor,
+    running:              bool,
+    fps:                  int,
+    dt:                   f32,
+    glyph_map:            map[rune]^sdl.Texture,
+    camera_scroll_vel:    vec2,
+    viewport_offset:      vec2,
+    active_buffer:        [dynamic]string,
+    active_buffer_bounds: vec2i,
+    treesitter:           Treesitter,
 }
 
 globals := Globals {
@@ -94,8 +92,6 @@ load_buffer :: proc(filename: string) {
     data_lines := strings.split_lines(data)
     for line, i in data_lines {
         append(&globals.active_buffer, line)
-        append(&globals.lines_to_redraw_this_frame, i)
-        append(&globals.chars_per_line, len(line))
     }
 }
 
@@ -351,13 +347,7 @@ draw_word :: proc(word: string, pos: vec2) {
 }
 
 get_char_color :: proc(index: int, char: rune, line_num: int) -> sdl.Color {
-    type: string
-    for token in globals.treesitter.data {
-        if index >= int(token.start_byte) && index <= int(token.end_byte) {
-            type = token.type
-        }
-    }
-
+    type := globals.treesitter.char_type_list[index]
     switch type {
     case "include":
         return sdl.Color{232, 59, 59, 255}
@@ -385,6 +375,7 @@ get_char_color :: proc(index: int, char: rune, line_num: int) -> sdl.Color {
     case "keyword.for":
         return sdl.Color{195, 36, 84, 255}
     }
+
     return sdl.Color{255, 255, 255, 255}
 }
 
@@ -434,7 +425,6 @@ draw_buffer :: proc() {
                 {f32(j) * get_character_spacing() + BUFFER_PADDING, f32(i) * get_line_height() + BUFFER_PADDING},
                 color,
             )
-
             char_byte += utf8.rune_size(char)
         }
         // increment for newline character
@@ -544,7 +534,7 @@ main :: proc() {
         sdl_poll_events()
         camera_update()
         cursor_update()
-        sdl.GetWindowSize(sdl_window, &globals.active_buffer_bounds.x, &globals.active_buffer_bounds.y)
+        sdl.GetWindowSizeInPixels(sdl_window, &globals.active_buffer_bounds.x, &globals.active_buffer_bounds.y)
 
         sdl.SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255)
         sdl.RenderClear(sdl_renderer)
@@ -554,7 +544,6 @@ main :: proc() {
         cursor_draw()
 
         sdl.SetWindowTitle(sdl_window, fmt.ctprintf("Editor - %vfps", globals.fps))
-        fmt.println(globals.fps)
         sdl.RenderPresent(sdl_renderer)
         calc_frame_info()
         free_all(context.temp_allocator)
