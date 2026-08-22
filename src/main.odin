@@ -56,16 +56,18 @@ Treesitter :: struct {
 }
 
 Globals :: struct {
-    cursor:               Cursor,
-    running:              bool,
-    fps:                  int,
-    dt:                   f32,
-    glyph_map:            map[rune]^sdl.Texture,
-    camera_scroll_vel:    vec2,
-    viewport_offset:      vec2,
-    active_buffer:        [dynamic]string,
-    active_buffer_bounds: vec2i,
-    treesitter:           Treesitter,
+    cursor:                     Cursor,
+    running:                    bool,
+    fps:                        int,
+    dt:                         f32,
+    glyph_map:                  map[rune]^sdl.Texture,
+    camera_scroll_vel:          vec2,
+    viewport_offset:            vec2,
+    active_buffer:              [dynamic]string,
+    active_buffer_bounds:       vec2i,
+    treesitter:                 Treesitter,
+    lines_to_redraw_this_frame: [dynamic]int,
+    chars_per_line:             [dynamic]int,
 }
 
 globals := Globals {
@@ -90,8 +92,10 @@ load_buffer :: proc(filename: string) {
     raw_file_data, load_ok := os.read_entire_file(filename, context.allocator)
     data := string(raw_file_data)
     data_lines := strings.split_lines(data)
-    for line in data_lines {
+    for line, i in data_lines {
         append(&globals.active_buffer, line)
+        append(&globals.lines_to_redraw_this_frame, i)
+        append(&globals.chars_per_line, len(line))
     }
 }
 
@@ -358,14 +362,28 @@ get_char_color :: proc(index: int, char: rune, line_num: int) -> sdl.Color {
     case "include":
         return sdl.Color{232, 59, 59, 255}
     case "variable":
+    case "punctuation.delimiter":
     case "namespace":
         return sdl.Color{255, 255, 255, 255}
     case "string":
         return sdl.Color{30, 188, 115, 255}
     case "type":
         return sdl.Color{249, 194, 43, 255}
+    case "operator":
+        return sdl.Color{143, 211, 255, 255}
     case "function.call":
         return sdl.Color{77, 155, 230, 255}
+    case "number":
+        return sdl.Color{234, 173, 237, 255}
+    case "punctuation.bracket":
+        return sdl.Color{199, 220, 208, 255}
+    case "comment":
+    case "spell":
+        return sdl.Color{98, 85, 101, 255}
+    case "keyword.function":
+    case "keyword.return":
+    case "keyword.for":
+        return sdl.Color{195, 36, 84, 255}
     }
     return sdl.Color{255, 255, 255, 255}
 }
@@ -401,9 +419,13 @@ draw_buffer :: proc() {
         globals.treesitter.outdated = false
     }
 
+    start_draw_line := i32(globals.viewport_offset.y / get_line_height())
+    end_draw_line :=
+        (globals.active_buffer_bounds.y) / i32(get_line_height()) + i32(globals.viewport_offset.y / get_line_height())
+
     char_byte := 0
     for line, i in globals.active_buffer {
-        // draw_text(fmt.tprint(i), {CHARACTER_SPACING + BUFFER_PADDING, f32(i * LINE_HEIGHT) + BUFFER_PADDING}, COLOR_GRAY)
+        if i32(i) < start_draw_line || i32(i) > end_draw_line {continue}
         for char, j in line {
             char_str := utf8.runes_to_string({char}, context.temp_allocator)
             color := get_char_color(char_byte, char, i)
@@ -531,6 +553,8 @@ main :: proc() {
         sdl.SetRenderDrawColor(sdl_renderer, 255, 255, 255, 255)
         cursor_draw()
 
+        sdl.SetWindowTitle(sdl_window, fmt.ctprintf("Editor - %vfps", globals.fps))
+        fmt.println(globals.fps)
         sdl.RenderPresent(sdl_renderer)
         calc_frame_info()
         free_all(context.temp_allocator)
