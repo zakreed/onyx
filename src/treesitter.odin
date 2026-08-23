@@ -3,6 +3,7 @@ package main
 import ts "../vendor/tree-sitter-odin"
 import ts_odin "../vendor/tree-sitter-odin/parsers/odin"
 import "core:fmt"
+import "core:math"
 import "core:os"
 import sdl "vendor:sdl3"
 
@@ -68,6 +69,9 @@ treesitter_get_char_color :: proc(index: int, char: rune, line_num: int) -> sdl.
 }
 
 treesitter_generate_color_list :: proc() {
+    clear(&globals.treesitter.data)
+    clear(&globals.treesitter.char_type_map)
+
     ts.query_cursor_exec(globals.treesitter.cursor, globals.treesitter.query, globals.treesitter.root)
     for match, cap_idx in ts.query_cursor_next_capture(globals.treesitter.cursor) {
         cap := match.captures[cap_idx]
@@ -93,20 +97,27 @@ treesitter_generate_color_list :: proc() {
     }
 }
 
-treesitter_update :: proc() {
-    start_byte: int
+_pos_to_byte :: proc(pos: vec2i) -> int {
+    byte: int
     for line, i in globals.active_buffer {
         if globals.cursor.prev_pos.y == i32(i) {break}
-        start_byte += len(line) + 1
+        byte += len(line) + 1
     }
-    start_byte += int(globals.cursor.prev_pos.x)
 
-    end_byte := start_byte + 1
+    return byte + int(pos.x)
+}
+
+treesitter_update :: proc() {
+    prev_byte := _pos_to_byte(globals.cursor.prev_pos)
+    cur_byte := _pos_to_byte(globals.cursor.pos)
+    start_byte := math.min(prev_byte, cur_byte)
+
+    fmt.println(prev_byte, cur_byte)
 
     edit := ts.Input_Edit {
         start_byte = u32(start_byte),
-        old_end_byte = u32(start_byte),
-        new_end_byte = u32(end_byte),
+        old_end_byte = u32(prev_byte),
+        new_end_byte = u32(cur_byte),
         start_point = ts.Point{row = u32(globals.cursor.prev_pos.y), col = u32(globals.cursor.prev_pos.x)},
         old_end_point = ts.Point{row = u32(globals.cursor.prev_pos.y), col = u32(globals.cursor.prev_pos.x)},
         new_end_point = ts.Point{row = u32(globals.cursor.pos.y), col = u32(globals.cursor.pos.x)},

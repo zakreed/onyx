@@ -118,20 +118,7 @@ sdl_poll_events :: proc() {
         case .QUIT:
             globals.running = false
         case .TEXT_INPUT:
-            buffer_insert(fmt.tprint(event.text.text))
-            if event.text.text == fmt.ctprint('{') {
-                buffer_insert("}")
-                cursor_move_left()
-            }
-            if event.text.text == fmt.ctprint('(') {
-                buffer_insert(")")
-                cursor_move_left()
-            }
-            if event.text.text == fmt.ctprint('[') {
-                buffer_insert("]")
-                cursor_move_left()
-            }
-            treesitter_update()
+            buffer_handle_input(event.text.text)
         case .KEY_DOWN:
             globals.treesitter.outdated = true
             #partial switch event.key.scancode {
@@ -139,6 +126,7 @@ sdl_poll_events :: proc() {
                 for i in 0 ..< TAB_WIDTH {
                     buffer_insert(" ")
                 }
+                treesitter_update()
             case .LGUI:
                 keyboard.holding_cmd = true
             case .BACKSPACE:
@@ -152,6 +140,7 @@ sdl_poll_events :: proc() {
                         buffer_remove_at_cursor()
                     }
                 }
+                treesitter_update()
             case .RETURN:
                 buffer_insert_newline()
                 if globals.cursor.pos != 0 {
@@ -167,6 +156,7 @@ sdl_poll_events :: proc() {
                         buffer_insert(" ")
                     }
                 }
+                treesitter_update()
             case .DOWN:
                 cursor_move_down()
             case .UP:
@@ -176,7 +166,6 @@ sdl_poll_events :: proc() {
             case .RIGHT:
                 cursor_move_right()
             }
-            treesitter_update()
 
         case .KEY_UP:
             #partial switch event.key.scancode {

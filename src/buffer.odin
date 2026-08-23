@@ -95,6 +95,23 @@ buffer_to_string :: proc() -> string {
     return strings.to_string(builder)
 }
 
+buffer_handle_input :: proc(char: cstring) {
+    buffer_insert(fmt.tprint(char))
+    if char == fmt.ctprint('{') {
+        buffer_insert("}")
+        cursor_move_left()
+    }
+    if char == fmt.ctprint('(') {
+        buffer_insert(")")
+        cursor_move_left()
+    }
+    if char == fmt.ctprint('[') {
+        buffer_insert("]")
+        cursor_move_left()
+    }
+    treesitter_update()
+}
+
 buffer_draw_char :: proc(text: string, pos: vec2, color: sdl.Color) {
     for char in text {
         texture := globals.glyph_map[char]
