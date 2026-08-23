@@ -38,33 +38,84 @@ treesitter_init :: proc() {
 
 treesitter_get_char_color :: proc(index: int, char: rune, line_num: int) -> sdl.Color {
     type := globals.treesitter.char_type_map[index]
+
     switch type {
+    case "bg":
+        return hex_to_sdl_color(globals.current_theme._bg)
+    case "pre.proc":
+        return hex_to_sdl_color(globals.current_theme._pre_proc)
     case "include":
-        return sdl.Color{232, 59, 59, 255}
-    case "variable":
-    case "punctuation.delimiter":
-    case "namespace":
-        return sdl.Color{255, 255, 255, 255}
-    case "string":
-        return sdl.Color{30, 188, 115, 255}
-    case "type":
-        return sdl.Color{249, 194, 43, 255}
-    case "operator":
-        return sdl.Color{143, 211, 255, 255}
-    case "function.call":
-        return sdl.Color{77, 155, 230, 255}
-    case "number":
-        return sdl.Color{234, 173, 237, 255}
-    case "punctuation.bracket":
-        return sdl.Color{199, 220, 208, 255}
-    case "comment":
-    case "spell":
-        return sdl.Color{98, 85, 101, 255}
+        return hex_to_sdl_color(globals.current_theme._include)
+    case "keyword":
+        return hex_to_sdl_color(globals.current_theme._keyword)
     case "keyword.function":
+        return hex_to_sdl_color(globals.current_theme._keyword_function)
     case "keyword.return":
-    case "keyword.for":
-        return sdl.Color{195, 36, 84, 255}
+        return hex_to_sdl_color(globals.current_theme._keyword_return)
+    case "storageclass":
+        return hex_to_sdl_color(globals.current_theme._storageclass)
+    case "conditional":
+        return hex_to_sdl_color(globals.current_theme._conditional)
+    case "conditional.ternary":
+        return hex_to_sdl_color(globals.current_theme._conditional_ternary)
+    case "repeat":
+        return hex_to_sdl_color(globals.current_theme._repeat)
+    case "variable":
+        return hex_to_sdl_color(globals.current_theme._variable)
+    case "namespace":
+        return hex_to_sdl_color(globals.current_theme._namespace)
+    case "constant":
+        return hex_to_sdl_color(globals.current_theme._conditional)
+    case "parameter":
+        return hex_to_sdl_color(globals.current_theme._parameter)
+    case "type":
+        return hex_to_sdl_color(globals.current_theme._type)
+    case "function":
+        return hex_to_sdl_color(globals.current_theme._function)
+    case "function.call":
+        return hex_to_sdl_color(globals.current_theme._function_call)
+    case "type.builtin":
+        return hex_to_sdl_color(globals.current_theme._type_builtin)
+    case "field":
+        return hex_to_sdl_color(globals.current_theme._field)
+    case "function.macro":
+        return hex_to_sdl_color(globals.current_theme._function_macro)
+    case "attribute":
+        return hex_to_sdl_color(globals.current_theme._attribute)
+    case "number":
+        return hex_to_sdl_color(globals.current_theme._number)
+    case "float":
+        return hex_to_sdl_color(globals.current_theme._float)
+    case "string":
+        return hex_to_sdl_color(globals.current_theme._string)
+    case "character":
+        return hex_to_sdl_color(globals.current_theme._character)
+    case "string.escape":
+        return hex_to_sdl_color(globals.current_theme._string_escape)
+    case "boolean":
+        return hex_to_sdl_color(globals.current_theme._boolean)
+    case "constant.builtin":
+        return hex_to_sdl_color(globals.current_theme._constant_builtin)
+    case "variable.builtin":
+        return hex_to_sdl_color(globals.current_theme._variable_builtin)
+    case "operator":
+        return hex_to_sdl_color(globals.current_theme._operator)
+    case "keyword.operator":
+        return hex_to_sdl_color(globals.current_theme._keyword_operator)
+    case "punctuation.bracket":
+        return hex_to_sdl_color(globals.current_theme._punctuation_bracket)
+    case "punctuation.delimiter":
+        return hex_to_sdl_color(globals.current_theme._punctuation_delimiter)
+    case "punctuation.special":
+        return hex_to_sdl_color(globals.current_theme._punctuation_special)
+    case "comment":
+        return hex_to_sdl_color(globals.current_theme._comment)
+    case "spell":
+        return hex_to_sdl_color(globals.current_theme._spell)
+    case "error":
+        return hex_to_sdl_color(globals.current_theme._error)
     }
+
     return sdl.Color{255, 255, 255, 255}
 }
 
@@ -78,6 +129,11 @@ treesitter_generate_color_list :: proc() {
         if len(ts.query_predicates_for_pattern(globals.treesitter.query, u32(match.pattern_index))) > 0 {
             continue
         }
+
+        fmt.println(
+            ts.node_text(cap.node, globals.treesitter.source),
+            ts.query_capture_name_for_id(globals.treesitter.query, cap.index),
+        )
 
         append(
             &globals.treesitter.data,
@@ -111,8 +167,6 @@ treesitter_update :: proc() {
     prev_byte := _pos_to_byte(globals.cursor.prev_pos)
     cur_byte := _pos_to_byte(globals.cursor.pos)
     start_byte := math.min(prev_byte, cur_byte)
-
-    fmt.println(prev_byte, cur_byte)
 
     edit := ts.Input_Edit {
         start_byte = u32(start_byte),

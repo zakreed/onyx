@@ -1,6 +1,5 @@
 package main
 
-import ts "../vendor/tree-sitter-odin"
 import "core:fmt"
 import "core:math"
 import "core:os"
@@ -54,10 +53,12 @@ Globals :: struct {
     active_buffer:        [dynamic]string,
     active_buffer_bounds: vec2i,
     treesitter:           Treesitter,
+    current_theme:        Theme,
 }
 
 globals := Globals {
-    running = true,
+    running       = true,
+    current_theme = theme_gruvbox_dark,
 }
 keyboard: Keyboard
 sdl_window: ^sdl.Window
@@ -273,7 +274,8 @@ main :: proc() {
         cursor_update()
         sdl.GetWindowSizeInPixels(sdl_window, &globals.active_buffer_bounds.x, &globals.active_buffer_bounds.y)
 
-        sdl.SetRenderDrawColor(sdl_renderer, 0, 0, 0, 255)
+        bg_color = hex_to_sdl_color(globals.current_theme._bg)
+        sdl.SetRenderDrawColor(sdl_renderer, bg_color.r, bg_color.g, bg_color.b, bg_color.a)
         sdl.RenderClear(sdl_renderer)
         buffer_draw()
 
