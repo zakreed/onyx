@@ -130,11 +130,6 @@ treesitter_generate_color_list :: proc() {
             continue
         }
 
-        fmt.println(
-            ts.node_text(cap.node, globals.treesitter.source),
-            ts.query_capture_name_for_id(globals.treesitter.query, cap.index),
-        )
-
         append(
             &globals.treesitter.data,
             TreesitterCapture {

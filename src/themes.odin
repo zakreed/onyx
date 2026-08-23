@@ -6,6 +6,7 @@ import sdl "vendor:sdl3"
 
 Theme :: struct {
     _bg:                    string,
+    _cursor:                string,
     _pre_proc:              string,
     _include:               string,
     _keyword:               string,
@@ -46,6 +47,7 @@ Theme :: struct {
 
 theme_gruvbox_dark := Theme {
     _bg                    = "1D2021",
+    _cursor                = "FFFFFF",
     _pre_proc              = "FFFFFF",
     _include               = "FB4934",
     _keyword               = "FB4934",
@@ -82,6 +84,47 @@ theme_gruvbox_dark := Theme {
     _comment               = "7C6F64",
     _spell                 = "7C6F64",
     _error                 = "FB4934",
+}
+
+theme_github_light := Theme {
+    _bg                    = "FFFFFF",
+    _cursor                = "1F2329",
+    _pre_proc              = "1F2329",
+    _include               = "CF212E",
+    _keyword               = "CF212E",
+    _keyword_function      = "CF212E",
+    _keyword_return        = "CF212E",
+    _storageclass          = "CF212E",
+    _conditional           = "CF212E",
+    _conditional_ternary   = "CF212E",
+    _repeat                = "CF212E",
+    _variable              = "1F2329",
+    _namespace             = "1F2329",
+    _constant              = "1F2329",
+    _parameter             = "1F2329",
+    _type                  = "CF212E",
+    _function              = "0350AE",
+    _function_call         = "0350AE",
+    _type_builtin          = "CF212E",
+    _field                 = "1F2329",
+    _function_macro        = "1F2329",
+    _attribute             = "1F2329",
+    _number                = "1F2329",
+    _float                 = "1F2329",
+    _string                = "1F2329",
+    _character             = "1F2329",
+    _string_escape         = "1F2329",
+    _boolean               = "1F2329",
+    _constant_builtin      = "CF212E",
+    _variable_builtin      = "1F2329",
+    _operator              = "1F2329",
+    _keyword_operator      = "1F2329",
+    _punctuation_bracket   = "1F2329",
+    _punctuation_delimiter = "1F2329",
+    _punctuation_special   = "1F2329",
+    _comment               = "093069",
+    _spell                 = "093069",
+    _error                 = "CF212E",
 }
 
 hex_to_sdl_color :: proc(hex_color: string) -> sdl.Color {

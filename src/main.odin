@@ -259,7 +259,7 @@ show_unsaved_changes_dialog :: proc() -> int {
 main :: proc() {
     sdl_init()
     ttf_init := ttf.Init(); assert(ttf_init)
-    font = ttf.OpenFont("GeistMono-Regular.ttf", get_font_size())
+    font = ttf.OpenFont("GeistMono-Medium.ttf", get_font_size())
     globals.glyph_map = glyph_map_new()
     load_buffer(LOADED_FILE)
     ok := sdl.StartTextInput(sdl_window)
@@ -279,7 +279,8 @@ main :: proc() {
         sdl.RenderClear(sdl_renderer)
         buffer_draw()
 
-        sdl.SetRenderDrawColor(sdl_renderer, 255, 255, 255, 255)
+        cursor_color := hex_to_sdl_color(globals.current_theme._cursor)
+        sdl.SetRenderDrawColor(sdl_renderer, cursor_color.r, cursor_color.g, cursor_color.b, cursor_color.a)
         cursor_draw()
 
         sdl.SetWindowTitle(sdl_window, fmt.ctprintf("Editor - %vfps", globals.fps))

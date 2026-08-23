@@ -8,7 +8,7 @@ import sdl "vendor:sdl3"
 import ttf "vendor:sdl3/ttf"
 
 glyph_map_new :: proc() -> map[rune]^sdl.Texture {
-    glyphs_to_generate := "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"£$%^&*()-_=+[]{};:'@#~,./<>?\\|"
+    glyphs_to_generate := "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"!£$%^&*()-_=+[]{};:'@#~,./<>?\\|"
     glyph_map := map[rune]^sdl.Texture{}
 
     for glyph in glyphs_to_generate {
