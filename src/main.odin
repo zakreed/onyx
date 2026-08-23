@@ -1,5 +1,6 @@
 package main
 
+import ts "../vendor/tree-sitter-odin"
 import "core:fmt"
 import "core:math"
 import "core:os"
@@ -119,16 +120,20 @@ sdl_poll_events :: proc() {
             buffer_insert(fmt.tprint(event.text.text))
             if event.text.text == fmt.ctprint('{') {
                 buffer_insert("}")
-                cursor_move_rel(x = -1)
+                cursor_move_left()
             }
             if event.text.text == fmt.ctprint('(') {
                 buffer_insert(")")
-                cursor_move_rel(x = -1)
+                cursor_move_left()
             }
             if event.text.text == fmt.ctprint('[') {
                 buffer_insert("]")
-                cursor_move_rel(x = -1)
+                cursor_move_left()
             }
+        // treesitter_update(ts.Input_Edit{
+
+        // 	start_point = {globals.cursor.pos.x, globals.cursor.pos.y}
+        // })
         case .KEY_DOWN:
             #partial switch event.key.scancode {
             case .TAB:
@@ -164,60 +169,13 @@ sdl_poll_events :: proc() {
                     }
                 }
             case .DOWN:
-                cursor_move_rel(y = 1)
-                if globals.cursor.pos.y > i32(len(globals.active_buffer)) - 1 {
-                    cursor_move_abs(y = i32(len(globals.active_buffer)) - 1)
-                }
-                if len(globals.active_buffer[int(globals.cursor.pos.y)]) < int(globals.cursor.desired_x) {
-                    cursor_move_abs(x = i32(len(globals.active_buffer[int(globals.cursor.pos.y)])))
-                } else {
-                    cursor_move_abs(x = globals.cursor.desired_x)
-                }
+                cursor_move_down()
             case .UP:
-                cursor_move_rel(y = -1)
-                if globals.cursor.pos.y < 0 {
-                    cursor_move_abs(y = 0)
-                }
-                if i32(len(globals.active_buffer[int(globals.cursor.pos.y)])) < globals.cursor.desired_x {
-                    cursor_move_abs(x = i32(len(globals.active_buffer[int(globals.cursor.pos.y)])))
-                } else {
-                    cursor_move_abs(x = globals.cursor.desired_x)
-                }
+                cursor_move_up()
             case .LEFT:
-                cursor_move_rel(x = -1)
-
-                if keyboard.holding_cmd {
-                    for char, i in globals.active_buffer[globals.cursor.pos.y][:globals.cursor.pos.x + 1] {
-                        if char != ' ' {
-                            cursor_move_abs(x = i32(i))
-                            globals.cursor.desired_x = globals.cursor.pos.x
-                            return
-                        }
-                    }
-                    cursor_move_abs(x = 0)
-
-                } else if globals.cursor.pos.x < 0 {
-                    if globals.cursor.pos.y - 1 >= 0 {
-                        cursor_move_abs(x = i32(len(globals.active_buffer[int(globals.cursor.pos.y - 1)])))
-                        if globals.cursor.pos.y != 0 {
-                            cursor_move_rel(y = -1)
-                        }
-                    } else {
-                        cursor_move_abs(x = 0)
-                    }
-                }
-                globals.cursor.desired_x = globals.cursor.pos.x
+                cursor_move_left()
             case .RIGHT:
-                cursor_move_rel(x = 1)
-                if keyboard.holding_cmd {
-                    globals.cursor.pos.x = i32(len(globals.active_buffer[globals.cursor.pos.y]))
-                } else if globals.cursor.pos.x > i32(len(globals.active_buffer[int(globals.cursor.pos.y)])) {
-                    cursor_move_abs(x = 0)
-                    if globals.cursor.pos.y != i32(len(globals.active_buffer)) - 1 {
-                        cursor_move_rel(y = 1)
-                    }
-                }
-                globals.cursor.desired_x = globals.cursor.pos.x
+                cursor_move_right()
             }
 
         case .KEY_UP:
@@ -332,6 +290,8 @@ main :: proc() {
 
         sdl.SetRenderDrawColor(sdl_renderer, 255, 255, 255, 255)
         cursor_draw()
+
+        fmt.println(globals.cursor.prev_pos, globals.cursor.pos)
 
         sdl.SetWindowTitle(sdl_window, fmt.ctprintf("Editor - %vfps", globals.fps))
         sdl.RenderPresent(sdl_renderer)

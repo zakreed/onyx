@@ -7,6 +7,7 @@ CURSOR_BLINK_DURATION :: 0.5
 
 Cursor :: struct {
     pos:            vec2i,
+    prev_pos:       vec2i,
     desired_x:      i32,
     blink_timer:    f32,
     visible:        bool,
@@ -27,20 +28,85 @@ _cursor_move_cursor_on_screen :: proc(x, y: i32) {
     }
 }
 
-// move the cursor relative to its current position
-cursor_move_rel :: proc(x: i32 = 0, y: i32 = 0) {
-    globals.cursor.pos.x += x
-    globals.cursor.pos.y += y
-    globals.cursor.has_just_moved = true
-
-    _cursor_move_cursor_on_screen(x, y)
-}
-
 // move the cursor to a new absolute position
 cursor_move_abs :: proc(x: i32 = globals.cursor.pos.x, y: i32 = globals.cursor.pos.y) {
     globals.cursor.pos.x = x
     globals.cursor.pos.y = y
     globals.cursor.has_just_moved = true
+}
+
+cursor_move_down :: proc() {
+    globals.cursor.prev_pos.y = globals.cursor.pos.y
+    globals.cursor.pos.y += 1
+    globals.cursor.has_just_moved = true
+
+    if globals.cursor.pos.y > i32(len(globals.active_buffer)) - 1 {
+        globals.cursor.pos.y = i32(len(globals.active_buffer)) - 1
+    }
+    if len(globals.active_buffer[int(globals.cursor.pos.y)]) < int(globals.cursor.desired_x) {
+        globals.cursor.pos.x = i32(len(globals.active_buffer[int(globals.cursor.pos.y)]))
+    } else {
+        globals.cursor.pos.x = globals.cursor.desired_x
+    }
+}
+
+cursor_move_up :: proc() {
+    globals.cursor.prev_pos.y = globals.cursor.pos.y
+    globals.cursor.pos.y -= 1
+    globals.cursor.has_just_moved = true
+
+    if globals.cursor.pos.y < 0 {
+        globals.cursor.pos.y = 0
+    }
+    if i32(len(globals.active_buffer[int(globals.cursor.pos.y)])) < globals.cursor.desired_x {
+        globals.cursor.pos.x = i32(len(globals.active_buffer[int(globals.cursor.pos.y)]))
+    } else {
+        globals.cursor.pos.x = globals.cursor.desired_x
+    }
+}
+
+cursor_move_left :: proc() {
+    globals.cursor.prev_pos.x = globals.cursor.pos.x
+    globals.cursor.pos.x -= 1
+    globals.cursor.has_just_moved = true
+
+    if keyboard.holding_cmd {
+        for char, i in globals.active_buffer[globals.cursor.pos.y][:globals.cursor.pos.x + 1] {
+            if char != ' ' {
+                globals.cursor.pos.x = i32(i)
+                globals.cursor.desired_x = globals.cursor.pos.x
+                return
+            }
+        }
+        globals.cursor.pos.x = 0
+
+    } else if globals.cursor.pos.x < 0 {
+        if globals.cursor.pos.y - 1 >= 0 {
+            globals.cursor.pos.x = i32(len(globals.active_buffer[int(globals.cursor.pos.y - 1)]))
+            if globals.cursor.pos.y != 0 {
+                globals.cursor.pos.y = -1
+            }
+        } else {
+            globals.cursor.pos.x = 0
+        }
+    }
+    globals.cursor.desired_x = globals.cursor.pos.x
+}
+
+cursor_move_right :: proc() {
+    globals.cursor.prev_pos.x = globals.cursor.pos.x
+    globals.cursor.pos.x += 1
+    globals.cursor.has_just_moved = true
+
+    if keyboard.holding_cmd {
+        globals.cursor.pos.x = i32(len(globals.active_buffer[globals.cursor.pos.y]))
+    } else if globals.cursor.pos.x > i32(len(globals.active_buffer[int(globals.cursor.pos.y)])) {
+        globals.cursor.pos.x = 0
+        if globals.cursor.pos.y != i32(len(globals.active_buffer)) - 1 {
+            globals.cursor.pos.y += 1
+        }
+    }
+    globals.cursor.desired_x = globals.cursor.pos.x
 }
 
 cursor_update :: proc() {

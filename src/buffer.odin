@@ -41,7 +41,7 @@ buffer_insert :: proc(char: string) {
     strings.write_string(&builder, current_line[int(globals.cursor.pos.x):])
 
     globals.active_buffer[int(globals.cursor.pos.y)] = strings.to_string(builder)
-    cursor_move_rel(x = 1)
+    cursor_move_right()
 }
 
 buffer_remove_at_cursor :: proc() {
@@ -55,7 +55,7 @@ buffer_remove_at_cursor :: proc() {
     strings.write_string(&builder, current_line[int(globals.cursor.pos.x):])
 
     globals.active_buffer[int(globals.cursor.pos.y)] = strings.to_string(builder)
-    cursor_move_rel(x = -1)
+    cursor_move_left()
 }
 
 buffer_insert_newline :: proc() {
@@ -65,7 +65,7 @@ buffer_insert_newline :: proc() {
 
     globals.active_buffer[globals.cursor.pos.y] = text_before_cursor
     inject_at(&globals.active_buffer, globals.cursor.pos.y + 1, text_beyond_cursor)
-    cursor_move_rel(y = 1)
+    cursor_move_down()
     cursor_move_abs(x = 0)
 }
 
