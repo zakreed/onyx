@@ -84,6 +84,17 @@ buffer_remove_line_content :: proc() {
     cursor_move_abs(x = 0)
 }
 
+buffer_to_string :: proc() -> string {
+    builder: strings.Builder
+    strings.builder_init(&builder)
+    for line in globals.active_buffer {
+        strings.write_string(&builder, line)
+        strings.write_string(&builder, "\n")
+    }
+
+    return strings.to_string(builder)
+}
+
 buffer_draw_char :: proc(text: string, pos: vec2, color: sdl.Color) {
     for char in text {
         texture := globals.glyph_map[char]
@@ -107,7 +118,7 @@ buffer_draw :: proc() {
         globals.treesitter.outdated = false
     }
 
-    start_draw_line := i32(globals.viewport_offset.y / get_line_height())
+    start_draw_line := i32(globals.viewport_offset.y / get_line_height()) - 2
     end_draw_line :=
         (globals.active_buffer_bounds.y) / i32(get_line_height()) + i32(globals.viewport_offset.y / get_line_height())
 

@@ -19,6 +19,7 @@ TAB_WIDTH :: 4
 SCROLL_SPEED :: 200
 SCROLL_FRICTION :: 10
 SCROLL_MARGIN :: 3
+LOADED_FILE :: "src/main.odin"
 vec2 :: [2]f32
 vec2i :: [2]i32
 
@@ -130,11 +131,9 @@ sdl_poll_events :: proc() {
                 buffer_insert("]")
                 cursor_move_left()
             }
-        // treesitter_update(ts.Input_Edit{
-
-        // 	start_point = {globals.cursor.pos.x, globals.cursor.pos.y}
-        // })
+            treesitter_update()
         case .KEY_DOWN:
+            globals.treesitter.outdated = true
             #partial switch event.key.scancode {
             case .TAB:
                 for i in 0 ..< TAB_WIDTH {
@@ -177,6 +176,7 @@ sdl_poll_events :: proc() {
             case .RIGHT:
                 cursor_move_right()
             }
+            treesitter_update()
 
         case .KEY_UP:
             #partial switch event.key.scancode {
@@ -271,7 +271,7 @@ main :: proc() {
     ttf_init := ttf.Init(); assert(ttf_init)
     font = ttf.OpenFont("GeistMono-Regular.ttf", get_font_size())
     globals.glyph_map = glyph_map_new()
-    load_buffer("src/main.odin")
+    load_buffer(LOADED_FILE)
     ok := sdl.StartTextInput(sdl_window)
     if !ok {
         fmt.println("[ERROR]: Failed to start text input")
@@ -290,8 +290,6 @@ main :: proc() {
 
         sdl.SetRenderDrawColor(sdl_renderer, 255, 255, 255, 255)
         cursor_draw()
-
-        fmt.println(globals.cursor.prev_pos, globals.cursor.pos)
 
         sdl.SetWindowTitle(sdl_window, fmt.ctprintf("Editor - %vfps", globals.fps))
         sdl.RenderPresent(sdl_renderer)

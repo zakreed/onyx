@@ -36,7 +36,7 @@ cursor_move_abs :: proc(x: i32 = globals.cursor.pos.x, y: i32 = globals.cursor.p
 }
 
 cursor_move_down :: proc() {
-    globals.cursor.prev_pos.y = globals.cursor.pos.y
+    globals.cursor.prev_pos = globals.cursor.pos
     globals.cursor.pos.y += 1
     globals.cursor.has_just_moved = true
 
@@ -51,7 +51,7 @@ cursor_move_down :: proc() {
 }
 
 cursor_move_up :: proc() {
-    globals.cursor.prev_pos.y = globals.cursor.pos.y
+    globals.cursor.prev_pos = globals.cursor.pos
     globals.cursor.pos.y -= 1
     globals.cursor.has_just_moved = true
 
@@ -66,7 +66,7 @@ cursor_move_up :: proc() {
 }
 
 cursor_move_left :: proc() {
-    globals.cursor.prev_pos.x = globals.cursor.pos.x
+    globals.cursor.prev_pos = globals.cursor.pos
     globals.cursor.pos.x -= 1
     globals.cursor.has_just_moved = true
 
@@ -84,7 +84,7 @@ cursor_move_left :: proc() {
         if globals.cursor.pos.y - 1 >= 0 {
             globals.cursor.pos.x = i32(len(globals.active_buffer[int(globals.cursor.pos.y - 1)]))
             if globals.cursor.pos.y != 0 {
-                globals.cursor.pos.y = -1
+                globals.cursor.pos.y -= 1
             }
         } else {
             globals.cursor.pos.x = 0
@@ -94,7 +94,7 @@ cursor_move_left :: proc() {
 }
 
 cursor_move_right :: proc() {
-    globals.cursor.prev_pos.x = globals.cursor.pos.x
+    globals.cursor.prev_pos = globals.cursor.pos
     globals.cursor.pos.x += 1
     globals.cursor.has_just_moved = true
 

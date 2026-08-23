@@ -2,11 +2,13 @@ package main
 
 import ts "../vendor/tree-sitter-odin"
 import ts_odin "../vendor/tree-sitter-odin/parsers/odin"
+import "core:fmt"
 import "core:os"
 import sdl "vendor:sdl3"
 
 Treesitter :: struct {
     source:        string,
+    parser:        ts.Parser,
     tree:          ts.Tree,
     root:          ts.Node,
     query:         ts.Query,
@@ -19,9 +21,10 @@ Treesitter :: struct {
 // TODO: Deduce language to use instead of hard coding it to odin
 treesitter_init :: proc() {
     parser := ts.parser_new()
+    globals.treesitter.parser = parser
     odin_lang := ts_odin.tree_sitter_odin()
     ts.parser_set_language(parser, odin_lang)
-    raw_file_data, load_ok := os.read_entire_file("src/main.odin", context.allocator)
+    raw_file_data, load_ok := os.read_entire_file(LOADED_FILE, context.allocator)
     source := string(raw_file_data)
     globals.treesitter.source = source
     globals.treesitter.tree = ts.parser_parse_string(parser, source)
@@ -88,4 +91,32 @@ treesitter_generate_color_list :: proc() {
             globals.treesitter.char_type_map[int(byte_index)] = capture.type
         }
     }
+}
+
+treesitter_update :: proc() {
+    start_byte: int
+    for line, i in globals.active_buffer {
+        if globals.cursor.prev_pos.y == i32(i) {break}
+        start_byte += len(line) + 1
+    }
+    start_byte += int(globals.cursor.prev_pos.x)
+
+    end_byte := start_byte + 1
+
+    edit := ts.Input_Edit {
+        start_byte = u32(start_byte),
+        old_end_byte = u32(start_byte),
+        new_end_byte = u32(end_byte),
+        start_point = ts.Point{row = u32(globals.cursor.prev_pos.y), col = u32(globals.cursor.prev_pos.x)},
+        old_end_point = ts.Point{row = u32(globals.cursor.prev_pos.y), col = u32(globals.cursor.prev_pos.x)},
+        new_end_point = ts.Point{row = u32(globals.cursor.pos.y), col = u32(globals.cursor.pos.x)},
+    }
+    ts.tree_edit(globals.treesitter.tree, &edit)
+
+    new_buffer_string := buffer_to_string()
+    defer delete(new_buffer_string)
+
+    globals.treesitter.source = new_buffer_string
+    globals.treesitter.tree = ts.parser_parse_string(globals.treesitter.parser, new_buffer_string, globals.treesitter.tree)
+    globals.treesitter.root = ts.tree_root_node(globals.treesitter.tree)
 }
