@@ -5,6 +5,7 @@ import ts_odin "../vendor/tree-sitter-odin/parsers/odin"
 import "core:fmt"
 import "core:math"
 import "core:os"
+import "core:strings"
 import sdl "vendor:sdl3"
 
 Treesitter :: struct {
@@ -148,10 +149,26 @@ treesitter_generate_color_list :: proc() {
     }
 }
 
-_pos_to_byte :: proc(pos: vec2i) -> int {
+_min_point :: proc(p1, p2: ts.Point) -> ts.Point {
+    if p1.row < p2.row {
+        return p1
+    } else if p2.row < p1.row {
+        return p2
+    } else if p1.row == p2.row {
+        if p1.col < p2.col {
+            return p1
+        } else if p2.col < p1.col {
+            return p2
+        }
+    }
+
+    return p1
+}
+
+_pos_to_byte :: proc(buffer: []string, pos: vec2i) -> int {
     byte: int
-    for line, i in globals.active_buffer {
-        if globals.cursor.prev_pos.y == i32(i) {break}
+    for line, i in buffer {
+        if pos.y == i32(i) {break}
         byte += len(line) + 1
     }
 
@@ -159,23 +176,33 @@ _pos_to_byte :: proc(pos: vec2i) -> int {
 }
 
 treesitter_update :: proc() {
-    prev_byte := _pos_to_byte(globals.cursor.prev_pos)
-    cur_byte := _pos_to_byte(globals.cursor.pos)
+    previous_buffer_data := strings.split_lines(globals.treesitter.source)
+    defer delete(previous_buffer_data)
+    prev_byte := _pos_to_byte(previous_buffer_data, globals.cursor.prev_pos)
+    cur_byte := _pos_to_byte(globals.active_buffer[:], globals.cursor.pos)
     start_byte := math.min(prev_byte, cur_byte)
+    prev_point := ts.Point {
+        row = u32(globals.cursor.prev_pos.y),
+        col = u32(globals.cursor.prev_pos.x),
+    }
+    cur_point := ts.Point {
+        row = u32(globals.cursor.pos.y),
+        col = u32(globals.cursor.pos.x),
+    }
+    start_point := _min_point(prev_point, cur_point)
 
     edit := ts.Input_Edit {
-        start_byte = u32(start_byte),
-        old_end_byte = u32(prev_byte),
-        new_end_byte = u32(cur_byte),
-        start_point = ts.Point{row = u32(globals.cursor.prev_pos.y), col = u32(globals.cursor.prev_pos.x)},
-        old_end_point = ts.Point{row = u32(globals.cursor.prev_pos.y), col = u32(globals.cursor.prev_pos.x)},
-        new_end_point = ts.Point{row = u32(globals.cursor.pos.y), col = u32(globals.cursor.pos.x)},
+        start_byte    = u32(start_byte),
+        old_end_byte  = u32(prev_byte),
+        new_end_byte  = u32(cur_byte),
+        start_point   = start_point,
+        old_end_point = prev_point,
+        new_end_point = cur_point,
     }
     ts.tree_edit(globals.treesitter.tree, &edit)
 
     new_buffer_string := buffer_to_string()
-    defer delete(new_buffer_string)
-
+    delete(globals.treesitter.source)
     globals.treesitter.source = new_buffer_string
     globals.treesitter.tree = ts.parser_parse_string(globals.treesitter.parser, new_buffer_string, globals.treesitter.tree)
     globals.treesitter.root = ts.tree_root_node(globals.treesitter.tree)

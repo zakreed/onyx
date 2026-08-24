@@ -18,7 +18,7 @@ TAB_WIDTH :: 4
 SCROLL_SPEED :: 200
 SCROLL_FRICTION :: 10
 SCROLL_MARGIN :: 3
-LOADED_FILE :: "src/main.odin"
+LOADED_FILE :: "test.odin"
 vec2 :: [2]f32
 vec2i :: [2]i32
 
