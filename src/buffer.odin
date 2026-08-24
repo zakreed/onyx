@@ -72,7 +72,7 @@ buffer_insert_newline :: proc() {
 buffer_remove_line :: proc() {
     ordered_remove(&globals.active_buffer, globals.cursor.pos.y)
     if globals.cursor.pos.y != 0 {
-        globals.cursor.pos.y -= 1
+        cursor_move_up()
     }
     cursor_move_abs(x = i32(len(globals.active_buffer[globals.cursor.pos.y])))
 }

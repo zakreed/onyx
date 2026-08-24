@@ -30,6 +30,7 @@ _cursor_move_cursor_on_screen :: proc(x, y: i32) {
 
 // move the cursor to a new absolute position
 cursor_move_abs :: proc(x: i32 = globals.cursor.pos.x, y: i32 = globals.cursor.pos.y) {
+    globals.cursor.prev_pos = globals.cursor.pos
     globals.cursor.pos.x = x
     globals.cursor.pos.y = y
     globals.cursor.has_just_moved = true
