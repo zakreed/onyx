@@ -41,7 +41,8 @@ buffer_insert :: proc(char: string) {
     strings.write_string(&builder, current_line[int(globals.cursor.pos.x):])
 
     globals.active_buffer[int(globals.cursor.pos.y)] = strings.to_string(builder)
-    cursor_move_right()
+    cursor_move(x = globals.cursor.pos.x + 1)
+    treesitter_update()
 }
 
 buffer_remove_at_cursor :: proc() {
@@ -55,7 +56,7 @@ buffer_remove_at_cursor :: proc() {
     strings.write_string(&builder, current_line[int(globals.cursor.pos.x):])
 
     globals.active_buffer[int(globals.cursor.pos.y)] = strings.to_string(builder)
-    cursor_move_left()
+    cursor_move(x = globals.cursor.pos.x - 1)
 }
 
 buffer_insert_newline :: proc() {
@@ -65,23 +66,22 @@ buffer_insert_newline :: proc() {
 
     globals.active_buffer[globals.cursor.pos.y] = text_before_cursor
     inject_at(&globals.active_buffer, globals.cursor.pos.y + 1, text_beyond_cursor)
-    cursor_move_down()
-    cursor_move_abs(x = 0)
+    cursor_move(x = 0, y = globals.cursor.pos.y + 1)
 }
 
 buffer_remove_line :: proc() {
     ordered_remove(&globals.active_buffer, globals.cursor.pos.y)
     if globals.cursor.pos.y != 0 {
-        cursor_move_up()
+        cursor_move(y = globals.cursor.pos.y - 1)
     }
-    cursor_move_abs(x = i32(len(globals.active_buffer[globals.cursor.pos.y])))
+    cursor_move(x = i32(len(globals.active_buffer[globals.cursor.pos.y])))
 }
 
 buffer_remove_line_content :: proc() {
     current_line := globals.active_buffer[globals.cursor.pos.y]
     text_beyond_cursor := current_line[globals.cursor.pos.x:]
     globals.active_buffer[globals.cursor.pos.y] = text_beyond_cursor
-    cursor_move_abs(x = 0)
+    cursor_move(x = 0)
 }
 
 buffer_to_string :: proc() -> string {
@@ -99,15 +99,18 @@ buffer_handle_input :: proc(char: cstring) {
     buffer_insert(fmt.tprint(char))
     if char == fmt.ctprint('{') {
         buffer_insert("}")
-        cursor_move_left()
+        treesitter_update()
+        cursor_move(x = globals.cursor.pos.x - 1)
     }
     if char == fmt.ctprint('(') {
         buffer_insert(")")
-        cursor_move_left()
+        treesitter_update()
+        cursor_move(x = globals.cursor.pos.x - 1)
     }
     if char == fmt.ctprint('[') {
         buffer_insert("]")
-        cursor_move_left()
+        treesitter_update()
+        cursor_move(x = globals.cursor.pos.x - 1)
     }
     treesitter_update()
 }

@@ -18,7 +18,7 @@ TAB_WIDTH :: 4
 SCROLL_SPEED :: 200
 SCROLL_FRICTION :: 10
 SCROLL_MARGIN :: 3
-LOADED_FILE :: "test.odin"
+LOADED_FILE :: "src/main.odin"
 vec2 :: [2]f32
 vec2i :: [2]i32
 
@@ -127,7 +127,6 @@ sdl_poll_events :: proc() {
                 for i in 0 ..< TAB_WIDTH {
                     buffer_insert(" ")
                 }
-                treesitter_update()
             case .LGUI:
                 keyboard.holding_cmd = true
             case .BACKSPACE:
@@ -159,13 +158,13 @@ sdl_poll_events :: proc() {
                 }
                 treesitter_update()
             case .DOWN:
-                cursor_move_down()
+                cursor_move(y = globals.cursor.pos.y + 1)
             case .UP:
-                cursor_move_up()
+                cursor_move(y = globals.cursor.pos.y - 1)
             case .LEFT:
-                cursor_move_left()
+                cursor_move(x = globals.cursor.pos.x - 1)
             case .RIGHT:
-                cursor_move_right()
+                cursor_move(x = globals.cursor.pos.x + 1)
             }
 
         case .KEY_UP:
@@ -184,15 +183,15 @@ sdl_poll_events :: proc() {
                 col_number := int(math.floor(pos.x - BUFFER_PADDING) / get_character_spacing())
 
                 if line_number >= len(globals.active_buffer) {
-                    cursor_move_abs(y = i32(len(globals.active_buffer)) - 1)
+                    cursor_move(y = i32(len(globals.active_buffer)) - 1)
                 } else if line_number >= 0 {
-                    cursor_move_abs(y = i32(line_number))
+                    cursor_move(y = i32(line_number))
                 }
 
                 if col_number >= len(globals.active_buffer[globals.cursor.pos.y]) {
-                    cursor_move_abs(x = i32(len(globals.active_buffer[globals.cursor.pos.y])))
+                    cursor_move(x = i32(len(globals.active_buffer[globals.cursor.pos.y])))
                 } else if col_number >= 0 {
-                    cursor_move_abs(x = i32(col_number))
+                    cursor_move(x = i32(col_number))
                 }
             }
         }
@@ -278,6 +277,8 @@ main :: proc() {
         sdl.SetRenderDrawColor(sdl_renderer, bg_color.r, bg_color.g, bg_color.b, bg_color.a)
         sdl.RenderClear(sdl_renderer)
         buffer_draw()
+
+        // fmt.println(globals.cursor.pos, globals.cursor.prev_pos)
 
         cursor_color := hex_to_sdl_color(globals.current_theme._cursor)
         sdl.SetRenderDrawColor(sdl_renderer, cursor_color.r, cursor_color.g, cursor_color.b, cursor_color.a)
