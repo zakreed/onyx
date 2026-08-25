@@ -1,7 +1,7 @@
 package main
 
-import ts "../vendor/tree-sitter-odin"
-import ts_odin "../vendor/tree-sitter-odin/parsers/odin"
+import ts "../vendor/odin-tree-sitter"
+import ts_odin "../vendor/odin-tree-sitter/parsers/odin"
 import "core:fmt"
 import "core:math"
 import "core:os"
