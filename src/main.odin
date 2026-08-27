@@ -28,12 +28,6 @@ COLOR_BLACK :: sdl.Color{0, 0, 0, 255}
 BUFFER_PADDING :: 32
 GUTTER_PADDING :: 48
 
-Buffer :: struct {
-    data:       [dynamic]string,
-    filename:   string,
-    viewbounds: string,
-}
-
 Keyboard :: struct {
     holding_shift: bool,
     holding_ctrl:  bool,
@@ -41,28 +35,18 @@ Keyboard :: struct {
     holding_cmd:   bool,
 }
 
-TreesitterCapture :: struct {
-    start_byte: u32,
-    end_byte:   u32,
-    token:      string,
-    type:       string,
-}
-
 Editor :: struct {
-    cursor:               Cursor,
-    running:              bool,
-    fps_timer_prev:       u64,
-    fps:                  int,
-    dt:                   f32,
-    glyph_map:            map[rune]^sdl.Texture,
-    camera_scroll_vel:    vec2,
-    viewport_offset:      vec2,
-    active_buffer:        [dynamic]string,
-    active_buffer_bounds: vec2i,
-    treesitter:           Treesitter,
-    current_theme:        Theme,
-    keyboard:             Keyboard,
-    buffers:              Buffer,
+    running:           bool,
+    fps_timer_prev:    u64,
+    fps:               int,
+    dt:                f32,
+    glyph_map:         map[rune]^sdl.Texture,
+    camera_scroll_vel: vec2,
+    treesitter:        Treesitter,
+    current_theme:     Theme,
+    keyboard:          Keyboard,
+    buffers:           [dynamic]Buffer,
+    active_buffer:     ^Buffer,
 }
 
 editor := Editor {
@@ -82,8 +66,10 @@ load_buffer :: proc(filename: string) {
     raw_file_data, load_ok := os.read_entire_file(filename, context.allocator)
     data := string(raw_file_data)
     data_lines := strings.split_lines(data)
+    append(&editor.buffers, Buffer{})
+    editor.active_buffer = &editor.buffers[0]
     for line, i in data_lines {
-        append(&editor.active_buffer, line)
+        append(&editor.active_buffer.data, line)
     }
 }
 
@@ -102,55 +88,55 @@ sdl_init :: proc() -> (^sdl.Window, ^sdl.Renderer) {
     return sdl_window, sdl_renderer
 }
 
-camera_update :: proc(window: ^sdl.Window) {
-    editor.viewport_offset.x += editor.camera_scroll_vel.x * f32(editor.dt)
-    editor.viewport_offset.y += editor.camera_scroll_vel.y * f32(editor.dt)
+camera_update :: proc(window: ^sdl.Window, buffer: ^Buffer) {
+    buffer.viewport_offset.x += editor.camera_scroll_vel.x * f32(editor.dt)
+    buffer.viewport_offset.y += editor.camera_scroll_vel.y * f32(editor.dt)
 
-    if editor.viewport_offset.y < 0 {
-        editor.viewport_offset.y = 0
+    if buffer.viewport_offset.y < 0 {
+        buffer.viewport_offset.y = 0
     }
-    if editor.viewport_offset.y > f32(len(editor.active_buffer)) * get_line_height(window) {
-        editor.viewport_offset.y = f32(len(editor.active_buffer)) * get_line_height(window)
+    if buffer.viewport_offset.y > f32(len(buffer.data)) * get_line_height(window) {
+        buffer.viewport_offset.y = f32(len(buffer.data)) * get_line_height(window)
     }
 
     editor.camera_scroll_vel.x = math.lerp(editor.camera_scroll_vel.x, f32(0), f32(SCROLL_FRICTION) * f32(editor.dt))
     editor.camera_scroll_vel.y = math.lerp(editor.camera_scroll_vel.y, f32(0), f32(SCROLL_FRICTION) * f32(editor.dt))
 }
 
-sdl_poll_events :: proc(window: ^sdl.Window, keyboard: ^Keyboard) {
+sdl_poll_events :: proc(window: ^sdl.Window, keyboard: ^Keyboard, buffer: ^Buffer) {
     event: sdl.Event
     for sdl.PollEvent(&event) {
         #partial switch event.type {
         case .QUIT:
             editor.running = false
         case .TEXT_INPUT:
-            buffer_handle_input(event.text.text)
+            buffer_handle_input(buffer, event.text.text)
         case .KEY_DOWN:
             editor.treesitter.outdated = true
             #partial switch event.key.scancode {
             case .TAB:
                 for i in 0 ..< TAB_WIDTH {
-                    buffer_insert(" ")
+                    buffer_insert(buffer, " ")
                 }
             case .LGUI:
                 keyboard.holding_cmd = true
             case .BACKSPACE:
-                if editor.cursor.pos == 0 {return}
-                if editor.cursor.pos.x == 0 {
-                    buffer_remove_line()
+                if buffer.cursor.pos == 0 {return}
+                if buffer.cursor.pos.x == 0 {
+                    buffer_remove_line(buffer)
                 } else {
                     if keyboard.holding_cmd {
-                        buffer_remove_line_content()
+                        buffer_remove_line_content(buffer)
                     } else {
-                        buffer_remove_at_cursor()
+                        buffer_remove_at_cursor(buffer)
                     }
                 }
-                treesitter_update()
+                treesitter_update(buffer)
             case .RETURN:
-                buffer_insert_newline()
-                if editor.cursor.pos != 0 {
+                buffer_insert_newline(buffer)
+                if buffer.cursor.pos != 0 {
                     spaces_before_content_on_prev_line := 0
-                    for char in editor.active_buffer[editor.cursor.pos.y - 1] {
+                    for char in buffer.data[buffer.cursor.pos.y - 1] {
                         if char == ' ' {
                             spaces_before_content_on_prev_line += 1
                         } else {
@@ -158,18 +144,18 @@ sdl_poll_events :: proc(window: ^sdl.Window, keyboard: ^Keyboard) {
                         }
                     }
                     for i in 0 ..< spaces_before_content_on_prev_line {
-                        buffer_insert(" ")
+                        buffer_insert(buffer, " ")
                     }
                 }
-                treesitter_update()
+                treesitter_update(buffer)
             case .DOWN:
-                cursor_move(y = editor.cursor.pos.y + 1)
+                cursor_move(buffer, y = buffer.cursor.pos.y + 1)
             case .UP:
-                cursor_move(y = editor.cursor.pos.y - 1)
+                cursor_move(buffer, y = buffer.cursor.pos.y - 1)
             case .LEFT:
-                cursor_move(x = editor.cursor.pos.x - 1)
+                cursor_move(buffer, x = buffer.cursor.pos.x - 1)
             case .RIGHT:
-                cursor_move(x = editor.cursor.pos.x + 1)
+                cursor_move(buffer, x = buffer.cursor.pos.x + 1)
             }
 
         case .KEY_UP:
@@ -183,20 +169,20 @@ sdl_poll_events :: proc(window: ^sdl.Window, keyboard: ^Keyboard) {
             }
         case .MOUSE_BUTTON_DOWN:
             if event.button.button == 1 {
-                pos := screen_to_world_pos(window, vec2{event.button.x, event.button.y})
+                pos := screen_to_world_pos(window, buffer, vec2{event.button.x, event.button.y})
                 line_number := int(math.floor((pos.y - BUFFER_PADDING) / get_line_height(window)))
                 col_number := int(math.floor(pos.x - BUFFER_PADDING) / get_character_spacing(window))
 
-                if line_number >= len(editor.active_buffer) {
-                    cursor_move(y = i32(len(editor.active_buffer)) - 1)
+                if line_number >= len(buffer.data) {
+                    cursor_move(buffer, y = i32(len(buffer.data)) - 1)
                 } else if line_number >= 0 {
-                    cursor_move(y = i32(line_number))
+                    cursor_move(buffer, y = i32(line_number))
                 }
 
-                if col_number >= len(editor.active_buffer[editor.cursor.pos.y]) {
-                    cursor_move(x = i32(len(editor.active_buffer[editor.cursor.pos.y])))
+                if col_number >= len(buffer.data[buffer.cursor.pos.y]) {
+                    cursor_move(buffer, x = i32(len(buffer.data[buffer.cursor.pos.y])))
                 } else if col_number >= 0 {
-                    cursor_move(x = i32(col_number))
+                    cursor_move(buffer, x = i32(col_number))
                 }
             }
         }
@@ -204,7 +190,7 @@ sdl_poll_events :: proc(window: ^sdl.Window, keyboard: ^Keyboard) {
 }
 
 // draws a non monospace font word
-draw_word :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, word: string, pos: vec2) {
+draw_word :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buffer: ^Buffer, word: string, pos: vec2) {
     x_pos_count: f32 = 0
 
     for char in word {
@@ -217,8 +203,8 @@ draw_word :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, word: string, po
         w, h: f32
         sdl.GetTextureSize(texture, &w, &h)
         dst := sdl.FRect {
-            x = pos.x + x_pos_count - editor.viewport_offset.x,
-            y = pos.y - editor.viewport_offset.y,
+            x = pos.x + x_pos_count - buffer.viewport_offset.x,
+            y = pos.y - buffer.viewport_offset.y,
             w = w,
             h = h,
         }
@@ -275,19 +261,19 @@ main :: proc() {
     load_buffer(LOADED_FILE)
 
     for (editor.running) {
-        sdl_poll_events(sdl_window, &keyboard)
-        camera_update(sdl_window)
-        cursor_update()
-        sdl.GetWindowSizeInPixels(sdl_window, &editor.active_buffer_bounds.x, &editor.active_buffer_bounds.y)
+        sdl_poll_events(sdl_window, &keyboard, editor.active_buffer)
+        camera_update(sdl_window, editor.active_buffer)
+        cursor_update(editor.active_buffer)
+        sdl.GetWindowSizeInPixels(sdl_window, &editor.active_buffer.viewbounds.x, &editor.active_buffer.viewbounds.y)
 
         bg_color := hex_to_sdl_color(editor.current_theme._bg)
         sdl.SetRenderDrawColor(sdl_renderer, bg_color.r, bg_color.g, bg_color.b, bg_color.a)
         sdl.RenderClear(sdl_renderer)
-        buffer_draw(sdl_window, sdl_renderer)
+        buffer_draw(sdl_window, sdl_renderer, editor.active_buffer)
 
         cursor_color := hex_to_sdl_color(editor.current_theme._cursor)
         sdl.SetRenderDrawColor(sdl_renderer, cursor_color.r, cursor_color.g, cursor_color.b, cursor_color.a)
-        cursor_draw(sdl_window, sdl_renderer)
+        cursor_draw(sdl_window, sdl_renderer, editor.active_buffer)
 
         sdl.SetWindowTitle(sdl_window, fmt.ctprintf("Editor - %vfps", editor.fps))
         sdl.RenderPresent(sdl_renderer)

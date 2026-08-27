@@ -8,6 +8,13 @@ import "core:os"
 import "core:strings"
 import sdl "vendor:sdl3"
 
+TreesitterCapture :: struct {
+    start_byte: u32,
+    end_byte:   u32,
+    token:      string,
+    type:       string,
+}
+
 Treesitter :: struct {
     source:        string,
     parser:        ts.Parser,
@@ -180,19 +187,19 @@ _pos_to_byte :: proc(buffer: []string, pos: vec2i) -> int {
     return byte + int(pos.x)
 }
 
-treesitter_update :: proc() {
+treesitter_update :: proc(buffer: ^Buffer) {
     previous_buffer_data := strings.split_lines(editor.treesitter.source)
     defer delete(previous_buffer_data)
-    prev_byte := _pos_to_byte(previous_buffer_data, editor.cursor.prev_pos)
-    cur_byte := _pos_to_byte(editor.active_buffer[:], editor.cursor.pos)
+    prev_byte := _pos_to_byte(previous_buffer_data, buffer.cursor.prev_pos)
+    cur_byte := _pos_to_byte(editor.active_buffer.data[:], buffer.cursor.pos)
     start_byte := math.min(prev_byte, cur_byte)
     prev_point := ts.Point {
-        row = u32(editor.cursor.prev_pos.y),
-        col = u32(editor.cursor.prev_pos.x),
+        row = u32(buffer.cursor.prev_pos.y),
+        col = u32(buffer.cursor.prev_pos.x),
     }
     cur_point := ts.Point {
-        row = u32(editor.cursor.pos.y),
-        col = u32(editor.cursor.pos.x),
+        row = u32(buffer.cursor.pos.y),
+        col = u32(buffer.cursor.pos.x),
     }
     start_point := _min_point(prev_point, cur_point)
 
@@ -206,7 +213,7 @@ treesitter_update :: proc() {
     }
     ts.tree_edit(editor.treesitter.tree, &edit)
 
-    new_buffer_string := buffer_to_string()
+    new_buffer_string := buffer_to_string(buffer)
     delete(editor.treesitter.source)
     editor.treesitter.source = new_buffer_string
     editor.treesitter.tree = ts.parser_parse_string(editor.treesitter.parser, new_buffer_string, editor.treesitter.tree)
