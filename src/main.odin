@@ -28,6 +28,12 @@ COLOR_BLACK :: sdl.Color{0, 0, 0, 255}
 BUFFER_PADDING :: 32
 GUTTER_PADDING :: 48
 
+Buffer :: struct {
+    data:       [dynamic]string,
+    filename:   string,
+    viewbounds: string,
+}
+
 Keyboard :: struct {
     holding_shift: bool,
     holding_ctrl:  bool,
@@ -42,9 +48,10 @@ TreesitterCapture :: struct {
     type:       string,
 }
 
-Globals :: struct {
+Editor :: struct {
     cursor:               Cursor,
     running:              bool,
+    fps_timer_prev:       u64,
     fps:                  int,
     dt:                   f32,
     glyph_map:            map[rune]^sdl.Texture,
@@ -54,25 +61,21 @@ Globals :: struct {
     active_buffer_bounds: vec2i,
     treesitter:           Treesitter,
     current_theme:        Theme,
+    keyboard:             Keyboard,
+    buffers:              Buffer,
 }
 
-globals := Globals {
-    running       = true,
-    current_theme = theme_gruvbox_dark,
+editor := Editor {
+    running        = true,
+    current_theme  = theme_gruvbox_dark,
+    fps_timer_prev = sdl.GetPerformanceCounter(),
 }
-keyboard: Keyboard
-sdl_window: ^sdl.Window
-sdl_renderer: ^sdl.Renderer
-font: ^ttf.Font
-bg_color := sdl.Color{255, 255, 255, 255}
-font_color := sdl.Color{0, 0, 0, 255}
-fps_timer_prev := sdl.GetPerformanceCounter()
 
 calc_frame_info :: proc() {
     fps_timer_now := sdl.GetPerformanceCounter()
-    globals.dt = (f32(fps_timer_now - fps_timer_prev)) / f32(sdl.GetPerformanceFrequency())
-    globals.fps = int(1 / globals.dt)
-    fps_timer_prev = fps_timer_now
+    editor.dt = (f32(fps_timer_now - editor.fps_timer_prev)) / f32(sdl.GetPerformanceFrequency())
+    editor.fps = int(1 / editor.dt)
+    editor.fps_timer_prev = fps_timer_now
 }
 
 load_buffer :: proc(filename: string) {
@@ -80,14 +83,14 @@ load_buffer :: proc(filename: string) {
     data := string(raw_file_data)
     data_lines := strings.split_lines(data)
     for line, i in data_lines {
-        append(&globals.active_buffer, line)
+        append(&editor.active_buffer, line)
     }
 }
 
-sdl_init :: proc() {
+sdl_init :: proc() -> (^sdl.Window, ^sdl.Renderer) {
     ok_init := sdl.Init({.VIDEO})
-    sdl_window = sdl.CreateWindow("Editor", DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT, {.RESIZABLE, .HIGH_PIXEL_DENSITY})
-    sdl_renderer = sdl.CreateRenderer(sdl_window, nil)
+    sdl_window := sdl.CreateWindow("Editor", DEFAULT_SCREEN_WIDTH, DEFAULT_SCREEN_HEIGHT, {.RESIZABLE, .HIGH_PIXEL_DENSITY})
+    sdl_renderer := sdl.CreateRenderer(sdl_window, nil)
     sdl.SetWindowMinimumSize(sdl_window, SCREEN_MIN_WIDTH, SCREEN_MIN_HEIGHT)
     ok_vsync := sdl.SetRenderVSync(sdl_renderer, 1)
 
@@ -95,33 +98,35 @@ sdl_init :: proc() {
     assert(sdl_window != nil)
     assert(sdl_renderer != nil)
     assert(ok_vsync)
+
+    return sdl_window, sdl_renderer
 }
 
-camera_update :: proc() {
-    globals.viewport_offset.x += globals.camera_scroll_vel.x * f32(globals.dt)
-    globals.viewport_offset.y += globals.camera_scroll_vel.y * f32(globals.dt)
+camera_update :: proc(window: ^sdl.Window) {
+    editor.viewport_offset.x += editor.camera_scroll_vel.x * f32(editor.dt)
+    editor.viewport_offset.y += editor.camera_scroll_vel.y * f32(editor.dt)
 
-    if globals.viewport_offset.y < 0 {
-        globals.viewport_offset.y = 0
+    if editor.viewport_offset.y < 0 {
+        editor.viewport_offset.y = 0
     }
-    if globals.viewport_offset.y > f32(len(globals.active_buffer)) * get_line_height() {
-        globals.viewport_offset.y = f32(len(globals.active_buffer)) * get_line_height()
+    if editor.viewport_offset.y > f32(len(editor.active_buffer)) * get_line_height(window) {
+        editor.viewport_offset.y = f32(len(editor.active_buffer)) * get_line_height(window)
     }
 
-    globals.camera_scroll_vel.x = math.lerp(globals.camera_scroll_vel.x, f32(0), f32(SCROLL_FRICTION) * f32(globals.dt))
-    globals.camera_scroll_vel.y = math.lerp(globals.camera_scroll_vel.y, f32(0), f32(SCROLL_FRICTION) * f32(globals.dt))
+    editor.camera_scroll_vel.x = math.lerp(editor.camera_scroll_vel.x, f32(0), f32(SCROLL_FRICTION) * f32(editor.dt))
+    editor.camera_scroll_vel.y = math.lerp(editor.camera_scroll_vel.y, f32(0), f32(SCROLL_FRICTION) * f32(editor.dt))
 }
 
-sdl_poll_events :: proc() {
+sdl_poll_events :: proc(window: ^sdl.Window, keyboard: ^Keyboard) {
     event: sdl.Event
     for sdl.PollEvent(&event) {
         #partial switch event.type {
         case .QUIT:
-            globals.running = false
+            editor.running = false
         case .TEXT_INPUT:
             buffer_handle_input(event.text.text)
         case .KEY_DOWN:
-            globals.treesitter.outdated = true
+            editor.treesitter.outdated = true
             #partial switch event.key.scancode {
             case .TAB:
                 for i in 0 ..< TAB_WIDTH {
@@ -130,8 +135,8 @@ sdl_poll_events :: proc() {
             case .LGUI:
                 keyboard.holding_cmd = true
             case .BACKSPACE:
-                if globals.cursor.pos == 0 {return}
-                if globals.cursor.pos.x == 0 {
+                if editor.cursor.pos == 0 {return}
+                if editor.cursor.pos.x == 0 {
                     buffer_remove_line()
                 } else {
                     if keyboard.holding_cmd {
@@ -143,9 +148,9 @@ sdl_poll_events :: proc() {
                 treesitter_update()
             case .RETURN:
                 buffer_insert_newline()
-                if globals.cursor.pos != 0 {
+                if editor.cursor.pos != 0 {
                     spaces_before_content_on_prev_line := 0
-                    for char in globals.active_buffer[globals.cursor.pos.y - 1] {
+                    for char in editor.active_buffer[editor.cursor.pos.y - 1] {
                         if char == ' ' {
                             spaces_before_content_on_prev_line += 1
                         } else {
@@ -158,13 +163,13 @@ sdl_poll_events :: proc() {
                 }
                 treesitter_update()
             case .DOWN:
-                cursor_move(y = globals.cursor.pos.y + 1)
+                cursor_move(y = editor.cursor.pos.y + 1)
             case .UP:
-                cursor_move(y = globals.cursor.pos.y - 1)
+                cursor_move(y = editor.cursor.pos.y - 1)
             case .LEFT:
-                cursor_move(x = globals.cursor.pos.x - 1)
+                cursor_move(x = editor.cursor.pos.x - 1)
             case .RIGHT:
-                cursor_move(x = globals.cursor.pos.x + 1)
+                cursor_move(x = editor.cursor.pos.x + 1)
             }
 
         case .KEY_UP:
@@ -174,22 +179,22 @@ sdl_poll_events :: proc() {
             }
         case .MOUSE_WHEEL:
             if event.wheel.y != 0 {
-                globals.camera_scroll_vel.y -= event.wheel.y * SCROLL_SPEED
+                editor.camera_scroll_vel.y -= event.wheel.y * SCROLL_SPEED
             }
         case .MOUSE_BUTTON_DOWN:
             if event.button.button == 1 {
-                pos := screen_to_world_pos(vec2{event.button.x, event.button.y})
-                line_number := int(math.floor((pos.y - BUFFER_PADDING) / get_line_height()))
-                col_number := int(math.floor(pos.x - BUFFER_PADDING) / get_character_spacing())
+                pos := screen_to_world_pos(window, vec2{event.button.x, event.button.y})
+                line_number := int(math.floor((pos.y - BUFFER_PADDING) / get_line_height(window)))
+                col_number := int(math.floor(pos.x - BUFFER_PADDING) / get_character_spacing(window))
 
-                if line_number >= len(globals.active_buffer) {
-                    cursor_move(y = i32(len(globals.active_buffer)) - 1)
+                if line_number >= len(editor.active_buffer) {
+                    cursor_move(y = i32(len(editor.active_buffer)) - 1)
                 } else if line_number >= 0 {
                     cursor_move(y = i32(line_number))
                 }
 
-                if col_number >= len(globals.active_buffer[globals.cursor.pos.y]) {
-                    cursor_move(x = i32(len(globals.active_buffer[globals.cursor.pos.y])))
+                if col_number >= len(editor.active_buffer[editor.cursor.pos.y]) {
+                    cursor_move(x = i32(len(editor.active_buffer[editor.cursor.pos.y])))
                 } else if col_number >= 0 {
                     cursor_move(x = i32(col_number))
                 }
@@ -199,42 +204,42 @@ sdl_poll_events :: proc() {
 }
 
 // draws a non monospace font word
-draw_word :: proc(word: string, pos: vec2) {
+draw_word :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, word: string, pos: vec2) {
     x_pos_count: f32 = 0
 
     for char in word {
         if char == ' ' {
-            x_pos_count += get_font_size() / 2
+            x_pos_count += get_font_size(window) / 2
             continue
         }
 
-        texture := globals.glyph_map[char]
+        texture := editor.glyph_map[char]
         w, h: f32
         sdl.GetTextureSize(texture, &w, &h)
         dst := sdl.FRect {
-            x = pos.x + x_pos_count - globals.viewport_offset.x,
-            y = pos.y - globals.viewport_offset.y,
+            x = pos.x + x_pos_count - editor.viewport_offset.x,
+            y = pos.y - editor.viewport_offset.y,
             w = w,
             h = h,
         }
-        sdl.RenderTexture(sdl_renderer, texture, nil, &dst)
+        sdl.RenderTexture(renderer, texture, nil, &dst)
         x_pos_count += w
     }
 }
 
-get_font_size :: proc() -> f32 {
-    return FONT_SIZE * sdl.GetWindowPixelDensity(sdl_window)
+get_font_size :: proc(window: ^sdl.Window) -> f32 {
+    return FONT_SIZE * sdl.GetWindowPixelDensity(window)
 }
 
-get_line_height :: proc() -> f32 {
-    return LINE_HEIGHT * sdl.GetWindowPixelDensity(sdl_window)
+get_line_height :: proc(window: ^sdl.Window) -> f32 {
+    return LINE_HEIGHT * sdl.GetWindowPixelDensity(window)
 }
 
-get_character_spacing :: proc() -> f32 {
-    return CHARACTER_SPACING * sdl.GetWindowPixelDensity(sdl_window)
+get_character_spacing :: proc(window: ^sdl.Window) -> f32 {
+    return CHARACTER_SPACING * sdl.GetWindowPixelDensity(window)
 }
 
-show_unsaved_changes_dialog :: proc() -> int {
+show_unsaved_changes_dialog :: proc(window: ^sdl.Window) -> int {
     buttons := []sdl.MessageBoxButtonData {
         {flags = {.RETURNKEY_DEFAULT}, buttonID = 0, text = "Save"},
         {flags = nil, buttonID = 1, text = "Discard"},
@@ -242,7 +247,7 @@ show_unsaved_changes_dialog :: proc() -> int {
     }
     data := sdl.MessageBoxData {
         flags      = {.WARNING},
-        window     = sdl_window,
+        window     = window,
         title      = "Unsaved changes",
         message    = "You have unsaved changes in this file. Do you want to save them?",
         numbuttons = i32(len(buttons)),
@@ -256,35 +261,35 @@ show_unsaved_changes_dialog :: proc() -> int {
 }
 
 main :: proc() {
-    sdl_init()
+    sdl_window, sdl_renderer := sdl_init()
+    active_buffers := make([dynamic]Buffer); defer delete(active_buffers)
     ttf_init := ttf.Init(); assert(ttf_init)
-    font = ttf.OpenFont("GeistMono-Medium.ttf", get_font_size())
-    globals.glyph_map = glyph_map_new()
-    load_buffer(LOADED_FILE)
+    font := ttf.OpenFont("GeistMono-Medium.ttf", get_font_size(sdl_window))
+    keyboard: Keyboard
+    editor.glyph_map = glyph_map_new(sdl_renderer, font)
     ok := sdl.StartTextInput(sdl_window)
     if !ok {
         fmt.println("[ERROR]: Failed to start text input")
     }
     treesitter_init()
+    load_buffer(LOADED_FILE)
 
-    for (globals.running) {
-        sdl_poll_events()
-        camera_update()
+    for (editor.running) {
+        sdl_poll_events(sdl_window, &keyboard)
+        camera_update(sdl_window)
         cursor_update()
-        sdl.GetWindowSizeInPixels(sdl_window, &globals.active_buffer_bounds.x, &globals.active_buffer_bounds.y)
+        sdl.GetWindowSizeInPixels(sdl_window, &editor.active_buffer_bounds.x, &editor.active_buffer_bounds.y)
 
-        bg_color = hex_to_sdl_color(globals.current_theme._bg)
+        bg_color := hex_to_sdl_color(editor.current_theme._bg)
         sdl.SetRenderDrawColor(sdl_renderer, bg_color.r, bg_color.g, bg_color.b, bg_color.a)
         sdl.RenderClear(sdl_renderer)
-        buffer_draw()
+        buffer_draw(sdl_window, sdl_renderer)
 
-        // fmt.println(globals.cursor.pos, globals.cursor.prev_pos)
-
-        cursor_color := hex_to_sdl_color(globals.current_theme._cursor)
+        cursor_color := hex_to_sdl_color(editor.current_theme._cursor)
         sdl.SetRenderDrawColor(sdl_renderer, cursor_color.r, cursor_color.g, cursor_color.b, cursor_color.a)
-        cursor_draw()
+        cursor_draw(sdl_window, sdl_renderer)
 
-        sdl.SetWindowTitle(sdl_window, fmt.ctprintf("Editor - %vfps", globals.fps))
+        sdl.SetWindowTitle(sdl_window, fmt.ctprintf("Editor - %vfps", editor.fps))
         sdl.RenderPresent(sdl_renderer)
         calc_frame_info()
         free_all(context.temp_allocator)

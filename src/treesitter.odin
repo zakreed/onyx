@@ -23,133 +23,133 @@ Treesitter :: struct {
 // TODO: Deduce language to use instead of hard coding it to odin
 treesitter_init :: proc() {
     parser := ts.parser_new()
-    globals.treesitter.parser = parser
+    editor.treesitter.parser = parser
     odin_lang := ts_odin.tree_sitter_odin()
     ts.parser_set_language(parser, odin_lang)
     raw_file_data, load_ok := os.read_entire_file(LOADED_FILE, context.allocator)
     source := string(raw_file_data)
-    globals.treesitter.source = source
-    globals.treesitter.tree = ts.parser_parse_string(parser, source)
-    globals.treesitter.root = ts.tree_root_node(globals.treesitter.tree)
+    editor.treesitter.source = source
+    editor.treesitter.tree = ts.parser_parse_string(parser, source)
+    editor.treesitter.root = ts.tree_root_node(editor.treesitter.tree)
     query, _, _ := ts.query_new(odin_lang, ts_odin.HIGHLIGHTS)
-    globals.treesitter.query = query
-    globals.treesitter.cursor = ts.query_cursor_new()
-    globals.treesitter.outdated = true
+    editor.treesitter.query = query
+    editor.treesitter.cursor = ts.query_cursor_new()
+    editor.treesitter.outdated = true
 }
 
 treesitter_get_char_color :: proc(index: int, char: rune, line_num: int) -> sdl.Color {
-    type := globals.treesitter.char_type_map[index]
+    type := editor.treesitter.char_type_map[index]
 
     switch type {
     case "bg":
-        return hex_to_sdl_color(globals.current_theme._bg)
+        return hex_to_sdl_color(editor.current_theme._bg)
     case "pre.proc":
-        return hex_to_sdl_color(globals.current_theme._pre_proc)
+        return hex_to_sdl_color(editor.current_theme._pre_proc)
     case "include":
-        return hex_to_sdl_color(globals.current_theme._include)
+        return hex_to_sdl_color(editor.current_theme._include)
     case "keyword":
-        return hex_to_sdl_color(globals.current_theme._keyword)
+        return hex_to_sdl_color(editor.current_theme._keyword)
     case "keyword.function":
-        return hex_to_sdl_color(globals.current_theme._keyword_function)
+        return hex_to_sdl_color(editor.current_theme._keyword_function)
     case "keyword.return":
-        return hex_to_sdl_color(globals.current_theme._keyword_return)
+        return hex_to_sdl_color(editor.current_theme._keyword_return)
     case "storageclass":
-        return hex_to_sdl_color(globals.current_theme._storageclass)
+        return hex_to_sdl_color(editor.current_theme._storageclass)
     case "conditional":
-        return hex_to_sdl_color(globals.current_theme._conditional)
+        return hex_to_sdl_color(editor.current_theme._conditional)
     case "conditional.ternary":
-        return hex_to_sdl_color(globals.current_theme._conditional_ternary)
+        return hex_to_sdl_color(editor.current_theme._conditional_ternary)
     case "repeat":
-        return hex_to_sdl_color(globals.current_theme._repeat)
+        return hex_to_sdl_color(editor.current_theme._repeat)
     case "variable":
-        return hex_to_sdl_color(globals.current_theme._variable)
+        return hex_to_sdl_color(editor.current_theme._variable)
     case "namespace":
-        return hex_to_sdl_color(globals.current_theme._namespace)
+        return hex_to_sdl_color(editor.current_theme._namespace)
     case "constant":
-        return hex_to_sdl_color(globals.current_theme._conditional)
+        return hex_to_sdl_color(editor.current_theme._conditional)
     case "parameter":
-        return hex_to_sdl_color(globals.current_theme._parameter)
+        return hex_to_sdl_color(editor.current_theme._parameter)
     case "type":
-        return hex_to_sdl_color(globals.current_theme._type)
+        return hex_to_sdl_color(editor.current_theme._type)
     case "function":
-        return hex_to_sdl_color(globals.current_theme._function)
+        return hex_to_sdl_color(editor.current_theme._function)
     case "function.call":
-        return hex_to_sdl_color(globals.current_theme._function_call)
+        return hex_to_sdl_color(editor.current_theme._function_call)
     case "type.builtin":
-        return hex_to_sdl_color(globals.current_theme._type_builtin)
+        return hex_to_sdl_color(editor.current_theme._type_builtin)
     case "field":
-        return hex_to_sdl_color(globals.current_theme._field)
+        return hex_to_sdl_color(editor.current_theme._field)
     case "function.macro":
-        return hex_to_sdl_color(globals.current_theme._function_macro)
+        return hex_to_sdl_color(editor.current_theme._function_macro)
     case "attribute":
-        return hex_to_sdl_color(globals.current_theme._attribute)
+        return hex_to_sdl_color(editor.current_theme._attribute)
     case "number":
-        return hex_to_sdl_color(globals.current_theme._number)
+        return hex_to_sdl_color(editor.current_theme._number)
     case "float":
-        return hex_to_sdl_color(globals.current_theme._float)
+        return hex_to_sdl_color(editor.current_theme._float)
     case "string":
-        return hex_to_sdl_color(globals.current_theme._string)
+        return hex_to_sdl_color(editor.current_theme._string)
     case "character":
-        return hex_to_sdl_color(globals.current_theme._character)
+        return hex_to_sdl_color(editor.current_theme._character)
     case "string.escape":
-        return hex_to_sdl_color(globals.current_theme._string_escape)
+        return hex_to_sdl_color(editor.current_theme._string_escape)
     case "boolean":
-        return hex_to_sdl_color(globals.current_theme._boolean)
+        return hex_to_sdl_color(editor.current_theme._boolean)
     case "constant.builtin":
-        return hex_to_sdl_color(globals.current_theme._constant_builtin)
+        return hex_to_sdl_color(editor.current_theme._constant_builtin)
     case "variable.builtin":
-        return hex_to_sdl_color(globals.current_theme._variable_builtin)
+        return hex_to_sdl_color(editor.current_theme._variable_builtin)
     case "operator":
-        return hex_to_sdl_color(globals.current_theme._operator)
+        return hex_to_sdl_color(editor.current_theme._operator)
     case "keyword.operator":
-        return hex_to_sdl_color(globals.current_theme._keyword_operator)
+        return hex_to_sdl_color(editor.current_theme._keyword_operator)
     case "punctuation.bracket":
-        return hex_to_sdl_color(globals.current_theme._punctuation_bracket)
+        return hex_to_sdl_color(editor.current_theme._punctuation_bracket)
     case "punctuation.delimiter":
-        return hex_to_sdl_color(globals.current_theme._punctuation_delimiter)
+        return hex_to_sdl_color(editor.current_theme._punctuation_delimiter)
     case "punctuation.special":
-        return hex_to_sdl_color(globals.current_theme._punctuation_special)
+        return hex_to_sdl_color(editor.current_theme._punctuation_special)
     case "comment":
-        return hex_to_sdl_color(globals.current_theme._comment)
+        return hex_to_sdl_color(editor.current_theme._comment)
     case "spell":
-        return hex_to_sdl_color(globals.current_theme._spell)
+        return hex_to_sdl_color(editor.current_theme._spell)
     case "error":
-        return hex_to_sdl_color(globals.current_theme._error)
+        return hex_to_sdl_color(editor.current_theme._error)
     }
 
     return sdl.Color{255, 255, 255, 255}
 }
 
 treesitter_generate_color_list :: proc() {
-    clear(&globals.treesitter.data)
-    clear(&globals.treesitter.char_type_map)
+    clear(&editor.treesitter.data)
+    clear(&editor.treesitter.char_type_map)
 
-    ts.query_cursor_exec(globals.treesitter.cursor, globals.treesitter.query, globals.treesitter.root)
-    for match, cap_idx in ts.query_cursor_next_capture(globals.treesitter.cursor) {
+    ts.query_cursor_exec(editor.treesitter.cursor, editor.treesitter.query, editor.treesitter.root)
+    for match, cap_idx in ts.query_cursor_next_capture(editor.treesitter.cursor) {
         cap := match.captures[cap_idx]
-        if len(ts.query_predicates_for_pattern(globals.treesitter.query, u32(match.pattern_index))) > 0 {
+        if len(ts.query_predicates_for_pattern(editor.treesitter.query, u32(match.pattern_index))) > 0 {
             continue
         }
 
         // fmt.println(
-        //     ts.node_text(cap.node, globals.treesitter.source),
-        //     ts.query_capture_name_for_id(globals.treesitter.query, cap.index),
+        //     ts.node_text(cap.node, editor.treesitter.source),
+        //     ts.query_capture_name_for_id(editor.treesitter.query, cap.index),
         // )
 
         append(
-            &globals.treesitter.data,
+            &editor.treesitter.data,
             TreesitterCapture {
                 start_byte = ts.node_start_byte(cap.node),
                 end_byte = ts.node_end_byte(cap.node),
-                token = ts.node_text(cap.node, globals.treesitter.source),
-                type = ts.query_capture_name_for_id(globals.treesitter.query, cap.index),
+                token = ts.node_text(cap.node, editor.treesitter.source),
+                type = ts.query_capture_name_for_id(editor.treesitter.query, cap.index),
             },
         )
     }
 
-    for capture in globals.treesitter.data {
+    for capture in editor.treesitter.data {
         for byte_index in capture.start_byte ..< capture.end_byte {
-            globals.treesitter.char_type_map[int(byte_index)] = capture.type
+            editor.treesitter.char_type_map[int(byte_index)] = capture.type
         }
     }
 }
@@ -181,18 +181,18 @@ _pos_to_byte :: proc(buffer: []string, pos: vec2i) -> int {
 }
 
 treesitter_update :: proc() {
-    previous_buffer_data := strings.split_lines(globals.treesitter.source)
+    previous_buffer_data := strings.split_lines(editor.treesitter.source)
     defer delete(previous_buffer_data)
-    prev_byte := _pos_to_byte(previous_buffer_data, globals.cursor.prev_pos)
-    cur_byte := _pos_to_byte(globals.active_buffer[:], globals.cursor.pos)
+    prev_byte := _pos_to_byte(previous_buffer_data, editor.cursor.prev_pos)
+    cur_byte := _pos_to_byte(editor.active_buffer[:], editor.cursor.pos)
     start_byte := math.min(prev_byte, cur_byte)
     prev_point := ts.Point {
-        row = u32(globals.cursor.prev_pos.y),
-        col = u32(globals.cursor.prev_pos.x),
+        row = u32(editor.cursor.prev_pos.y),
+        col = u32(editor.cursor.prev_pos.x),
     }
     cur_point := ts.Point {
-        row = u32(globals.cursor.pos.y),
-        col = u32(globals.cursor.pos.x),
+        row = u32(editor.cursor.pos.y),
+        col = u32(editor.cursor.pos.x),
     }
     start_point := _min_point(prev_point, cur_point)
 
@@ -204,11 +204,11 @@ treesitter_update :: proc() {
         old_end_point = prev_point,
         new_end_point = cur_point,
     }
-    ts.tree_edit(globals.treesitter.tree, &edit)
+    ts.tree_edit(editor.treesitter.tree, &edit)
 
     new_buffer_string := buffer_to_string()
-    delete(globals.treesitter.source)
-    globals.treesitter.source = new_buffer_string
-    globals.treesitter.tree = ts.parser_parse_string(globals.treesitter.parser, new_buffer_string, globals.treesitter.tree)
-    globals.treesitter.root = ts.tree_root_node(globals.treesitter.tree)
+    delete(editor.treesitter.source)
+    editor.treesitter.source = new_buffer_string
+    editor.treesitter.tree = ts.parser_parse_string(editor.treesitter.parser, new_buffer_string, editor.treesitter.tree)
+    editor.treesitter.root = ts.tree_root_node(editor.treesitter.tree)
 }

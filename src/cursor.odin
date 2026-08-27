@@ -16,109 +16,109 @@ Cursor :: struct {
 
 // TODO: Add some polish to this. You can also click on a line that is mostly offscreen and the camera doesn't move it fully into view.
 // 		 Scrolling when the cursor is already out of the scroll margin causes issues too.
-_cursor_move_cursor_on_screen :: proc(x, y: i32) {
-    lines_on_screen := (globals.active_buffer_bounds.y - BUFFER_PADDING) / i32(get_line_height())
-    cursor_screen_pos_y := globals.cursor.pos.y - (i32(globals.viewport_offset.y) / i32(get_line_height()))
+_cursor_move_cursor_on_screen :: proc(window: ^sdl.Window, x, y: i32) {
+    lines_on_screen := (editor.active_buffer_bounds.y - BUFFER_PADDING) / i32(get_line_height(window))
+    cursor_screen_pos_y := editor.cursor.pos.y - (i32(editor.viewport_offset.y) / i32(get_line_height(window)))
 
     if y > 0 && cursor_screen_pos_y > lines_on_screen - SCROLL_MARGIN {
-        globals.viewport_offset.y += get_line_height()
+        editor.viewport_offset.y += get_line_height(window)
     }
-    if y < 0 && cursor_screen_pos_y < SCROLL_MARGIN - BUFFER_PADDING / i32(get_line_height()) {
-        globals.viewport_offset.y -= get_line_height()
+    if y < 0 && cursor_screen_pos_y < SCROLL_MARGIN - BUFFER_PADDING / i32(get_line_height(window)) {
+        editor.viewport_offset.y -= get_line_height(window)
     }
 }
 
-cursor_move :: proc(x: i32 = globals.cursor.pos.x, y: i32 = globals.cursor.pos.y) {
-    prev_prev_pos := globals.cursor.prev_pos
-    globals.cursor.prev_pos = globals.cursor.pos
-    globals.cursor.pos.x = x
-    globals.cursor.pos.y = y
-    globals.cursor.has_just_moved = true
-    move_delta := globals.cursor.pos - globals.cursor.prev_pos
+cursor_move :: proc(x: i32 = editor.cursor.pos.x, y: i32 = editor.cursor.pos.y) {
+    prev_prev_pos := editor.cursor.prev_pos
+    editor.cursor.prev_pos = editor.cursor.pos
+    editor.cursor.pos.x = x
+    editor.cursor.pos.y = y
+    editor.cursor.has_just_moved = true
+    move_delta := editor.cursor.pos - editor.cursor.prev_pos
 
     if move_delta.x < 0 {
-        if keyboard.holding_cmd {
-            for char, i in globals.active_buffer[globals.cursor.pos.y][:globals.cursor.pos.x + 1] {
+        if editor.keyboard.holding_cmd {
+            for char, i in editor.active_buffer[editor.cursor.pos.y][:editor.cursor.pos.x] {
                 if char != ' ' {
-                    globals.cursor.pos.x = i32(i)
-                    globals.cursor.desired_x = globals.cursor.pos.x
+                    editor.cursor.pos.x = i32(i)
+                    editor.cursor.desired_x = editor.cursor.pos.x
                     return
                 }
             }
-            globals.cursor.pos.x = 0
+            editor.cursor.pos.x = 0
 
-        } else if globals.cursor.pos.x < 0 {
-            if globals.cursor.pos.y - 1 >= 0 {
-                globals.cursor.pos.x = i32(len(globals.active_buffer[int(globals.cursor.pos.y - 1)]))
-                if globals.cursor.pos.y != 0 {
-                    globals.cursor.pos.y -= 1
+        } else if editor.cursor.pos.x < 0 {
+            if editor.cursor.pos.y - 1 >= 0 {
+                editor.cursor.pos.x = i32(len(editor.active_buffer[int(editor.cursor.pos.y - 1)]))
+                if editor.cursor.pos.y != 0 {
+                    editor.cursor.pos.y -= 1
                 }
             } else {
-                globals.cursor.pos.x = 0
+                editor.cursor.pos.x = 0
             }
         }
-        globals.cursor.desired_x = globals.cursor.pos.x
+        editor.cursor.desired_x = editor.cursor.pos.x
     }
     if move_delta.x > 0 {
-        if keyboard.holding_cmd {
-            globals.cursor.pos.x = i32(len(globals.active_buffer[globals.cursor.pos.y]))
-        } else if globals.cursor.pos.x > i32(len(globals.active_buffer[int(globals.cursor.pos.y)])) {
-            globals.cursor.pos.x = 0
-            if globals.cursor.pos.y != i32(len(globals.active_buffer)) - 1 {
-                globals.cursor.pos.y += 1
+        if editor.keyboard.holding_cmd {
+            editor.cursor.pos.x = i32(len(editor.active_buffer[editor.cursor.pos.y]))
+        } else if editor.cursor.pos.x > i32(len(editor.active_buffer[int(editor.cursor.pos.y)])) {
+            editor.cursor.pos.x = 0
+            if editor.cursor.pos.y != i32(len(editor.active_buffer)) - 1 {
+                editor.cursor.pos.y += 1
             }
         }
-        globals.cursor.desired_x = globals.cursor.pos.x
+        editor.cursor.desired_x = editor.cursor.pos.x
     }
     if move_delta.y < 0 {
-        if globals.cursor.pos.y < 0 {
-            globals.cursor.pos.y = 0
+        if editor.cursor.pos.y < 0 {
+            editor.cursor.pos.y = 0
         }
-        if i32(len(globals.active_buffer[int(globals.cursor.pos.y)])) < globals.cursor.desired_x {
-            globals.cursor.pos.x = i32(len(globals.active_buffer[int(globals.cursor.pos.y)]))
+        if i32(len(editor.active_buffer[int(editor.cursor.pos.y)])) < editor.cursor.desired_x {
+            editor.cursor.pos.x = i32(len(editor.active_buffer[int(editor.cursor.pos.y)]))
         } else {
-            globals.cursor.pos.x = globals.cursor.desired_x
+            editor.cursor.pos.x = editor.cursor.desired_x
         }
     }
     if move_delta.y > 0 {
-        if globals.cursor.pos.y > i32(len(globals.active_buffer)) - 1 {
-            globals.cursor.pos.y = i32(len(globals.active_buffer)) - 1
+        if editor.cursor.pos.y > i32(len(editor.active_buffer)) - 1 {
+            editor.cursor.pos.y = i32(len(editor.active_buffer)) - 1
         }
-        if len(globals.active_buffer[int(globals.cursor.pos.y)]) < int(globals.cursor.desired_x) {
-            globals.cursor.pos.x = i32(len(globals.active_buffer[int(globals.cursor.pos.y)]))
+        if len(editor.active_buffer[int(editor.cursor.pos.y)]) < int(editor.cursor.desired_x) {
+            editor.cursor.pos.x = i32(len(editor.active_buffer[int(editor.cursor.pos.y)]))
         } else {
-            globals.cursor.pos.x = globals.cursor.desired_x
+            editor.cursor.pos.x = editor.cursor.desired_x
         }
     }
 
     // disallow prev_pos to be equal to the current pos as it will break a lot of the treesitter parsing
-    if globals.cursor.pos == globals.cursor.prev_pos {
-        globals.cursor.prev_pos = prev_prev_pos
+    if editor.cursor.pos == editor.cursor.prev_pos {
+        editor.cursor.prev_pos = prev_prev_pos
     }
 }
 
 cursor_update :: proc() {
-    if globals.cursor.has_just_moved {
-        globals.cursor.visible = true
-        globals.cursor.blink_timer = 0
-        globals.cursor.has_just_moved = false
+    if editor.cursor.has_just_moved {
+        editor.cursor.visible = true
+        editor.cursor.blink_timer = 0
+        editor.cursor.has_just_moved = false
     }
 
-    globals.cursor.blink_timer += globals.dt
-    if globals.cursor.blink_timer > CURSOR_BLINK_DURATION {
-        globals.cursor.visible = !globals.cursor.visible
-        globals.cursor.blink_timer = 0
+    editor.cursor.blink_timer += editor.dt
+    if editor.cursor.blink_timer > CURSOR_BLINK_DURATION {
+        editor.cursor.visible = !editor.cursor.visible
+        editor.cursor.blink_timer = 0
     }
 }
 
-cursor_draw :: proc() {
-    if !globals.cursor.visible {return}
+cursor_draw :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer) {
+    if !editor.cursor.visible {return}
 
     rect := sdl.FRect {
-        x = ((f32(globals.cursor.pos.x) * get_character_spacing()) + BUFFER_PADDING) - globals.viewport_offset.x,
-        y = ((f32(globals.cursor.pos.y) * get_line_height()) + BUFFER_PADDING - 3) - globals.viewport_offset.y,
+        x = ((f32(editor.cursor.pos.x) * get_character_spacing(window)) + BUFFER_PADDING) - editor.viewport_offset.x,
+        y = ((f32(editor.cursor.pos.y) * get_line_height(window)) + BUFFER_PADDING - 3) - editor.viewport_offset.y,
         w = 2,
-        h = get_line_height(),
+        h = get_line_height(window),
     }
-    sdl.RenderFillRect(sdl_renderer, &rect)
+    sdl.RenderFillRect(renderer, &rect)
 }
