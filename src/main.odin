@@ -1,5 +1,7 @@
 package main
 
+import "base:runtime"
+import "core:c"
 import "core:fmt"
 import "core:math"
 import "core:os"
@@ -67,7 +69,7 @@ load_buffer :: proc(filename: string) {
     data := string(raw_file_data)
     data_lines := strings.split_lines(data)
     append(&editor.buffers, Buffer{})
-    editor.active_buffer = &editor.buffers[0]
+    editor.active_buffer = &editor.buffers[len(editor.buffers) - 1]
     for line, i in data_lines {
         append(&editor.active_buffer.data, line)
     }
@@ -103,7 +105,7 @@ camera_update :: proc(window: ^sdl.Window, buffer: ^Buffer) {
     editor.camera_scroll_vel.y = math.lerp(editor.camera_scroll_vel.y, f32(0), f32(SCROLL_FRICTION) * f32(editor.dt))
 }
 
-sdl_poll_events :: proc(window: ^sdl.Window, keyboard: ^Keyboard, buffer: ^Buffer) {
+sdl_poll_events :: proc(window: ^sdl.Window, buffer: ^Buffer) {
     event: sdl.Event
     for sdl.PollEvent(&event) {
         #partial switch event.type {
@@ -119,13 +121,13 @@ sdl_poll_events :: proc(window: ^sdl.Window, keyboard: ^Keyboard, buffer: ^Buffe
                     buffer_insert(buffer, " ")
                 }
             case .LGUI:
-                keyboard.holding_cmd = true
+                editor.keyboard.holding_cmd = true
             case .BACKSPACE:
                 if buffer.cursor.pos == 0 {return}
                 if buffer.cursor.pos.x == 0 {
                     buffer_remove_line(buffer)
                 } else {
-                    if keyboard.holding_cmd {
+                    if editor.keyboard.holding_cmd {
                         buffer_remove_line_content(buffer)
                     } else {
                         buffer_remove_at_cursor(buffer)
@@ -156,12 +158,18 @@ sdl_poll_events :: proc(window: ^sdl.Window, keyboard: ^Keyboard, buffer: ^Buffe
                 cursor_move(buffer, x = buffer.cursor.pos.x - 1)
             case .RIGHT:
                 cursor_move(buffer, x = buffer.cursor.pos.x + 1)
+
+            case .O:
+                if editor.keyboard.holding_cmd {
+                    fmt.println("hello")
+                    show_open_file_dialog(window)
+                }
             }
 
         case .KEY_UP:
             #partial switch event.key.scancode {
             case .LGUI:
-                keyboard.holding_cmd = false
+                editor.keyboard.holding_cmd = false
             }
         case .MOUSE_WHEEL:
             if event.wheel.y != 0 {
@@ -246,6 +254,18 @@ show_unsaved_changes_dialog :: proc(window: ^sdl.Window) -> int {
     return int(button_id)
 }
 
+open_file_callback :: proc "c" (userdata: rawptr, filelist: [^]cstring, filter: c.int) {
+    context = runtime.default_context()
+    if filelist != nil {
+        file_path := string(filelist[0])
+        load_buffer(file_path)
+    }
+}
+
+show_open_file_dialog :: proc(window: ^sdl.Window) {
+    sdl.ShowOpenFileDialog(open_file_callback, nil, window, nil, 0, "", false)
+}
+
 main :: proc() {
     sdl_window, sdl_renderer := sdl_init()
     active_buffers := make([dynamic]Buffer); defer delete(active_buffers)
@@ -261,7 +281,7 @@ main :: proc() {
     load_buffer(LOADED_FILE)
 
     for (editor.running) {
-        sdl_poll_events(sdl_window, &keyboard, editor.active_buffer)
+        sdl_poll_events(sdl_window, editor.active_buffer)
         camera_update(sdl_window, editor.active_buffer)
         cursor_update(editor.active_buffer)
         sdl.GetWindowSizeInPixels(sdl_window, &editor.active_buffer.viewbounds.x, &editor.active_buffer.viewbounds.y)
