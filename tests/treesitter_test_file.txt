@@ -1,0 +1,17 @@
+package main
+
+import "core:fmt"
+
+Foo :: struct {
+    field_1: string
+    field_2: u32
+}
+
+bar :: proc() {
+    thing: Foo
+    items := []int{1, 2, 3, 4}
+
+    for item in items {
+        fmt.println(item)
+    }
+}

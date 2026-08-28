@@ -4,6 +4,9 @@ all:
 	odin build ./src -out:editor
 	./editor
 
+test:
+	odin test tests/
+
 release:
 	odin build ./src -o:speed -out:editor
 
