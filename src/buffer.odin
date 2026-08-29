@@ -78,11 +78,16 @@ buffer_insert_newline :: proc(buffer: ^Buffer) {
 }
 
 buffer_remove_line :: proc(buffer: ^Buffer) {
+    prev_line_content := buffer.data[buffer.cursor.pos.y]
     ordered_remove(&buffer.data, buffer.cursor.pos.y)
     if buffer.cursor.pos.y != 0 {
-        cursor_move(buffer, y = buffer.cursor.pos.y - 1)
+        text_on_line_above := buffer.data[buffer.cursor.pos.y - 1]
+        fmt.println(len(text_on_line_above))
+        cursor_move(buffer, x = i32(len(text_on_line_above)), y = buffer.cursor.pos.y - 1)
+        buffer.data[buffer.cursor.pos.y] = fmt.aprintf("%v%v", text_on_line_above, prev_line_content)
+    } else {
+        cursor_move(buffer, x = i32(len(buffer.data[buffer.cursor.pos.y])))
     }
-    cursor_move(buffer, x = i32(len(buffer.data[buffer.cursor.pos.y])))
 }
 
 buffer_remove_line_content :: proc(buffer: ^Buffer) {
@@ -107,20 +112,20 @@ buffer_handle_input :: proc(buffer: ^Buffer, char: cstring) {
     buffer_insert(buffer, fmt.tprint(char))
     if char == fmt.ctprint('{') {
         buffer_insert(buffer, "}")
-        treesitter_update(buffer)
+        // treesitter_update(buffer)
         cursor_move(buffer, x = buffer.cursor.pos.x - 1)
     }
     if char == fmt.ctprint('(') {
         buffer_insert(buffer, ")")
-        treesitter_update(buffer)
+        // treesitter_update(buffer)
         cursor_move(buffer, x = buffer.cursor.pos.x - 1)
     }
     if char == fmt.ctprint('[') {
         buffer_insert(buffer, "]")
-        treesitter_update(buffer)
+        // treesitter_update(buffer)
         cursor_move(buffer, x = buffer.cursor.pos.x - 1)
     }
-    treesitter_update(buffer)
+    // treesitter_update(buffer)
 }
 
 buffer_draw_char :: proc(renderer: ^sdl.Renderer, buffer: ^Buffer, text: string, pos: vec2, color: sdl.Color) {
