@@ -7,6 +7,7 @@ import sdl "vendor:sdl3"
 Theme :: struct {
     _bg:                    string,
     _cursor:                string,
+    _cursor_highlight:      string,
     _pre_proc:              string,
     _include:               string,
     _keyword:               string,
@@ -48,6 +49,7 @@ Theme :: struct {
 theme_gruvbox_dark := Theme {
     _bg                    = "1D2021",
     _cursor                = "FFFFFF",
+    _cursor_highlight      = "282828",
     _pre_proc              = "FFFFFF",
     _include               = "FB4934",
     _keyword               = "FB4934",

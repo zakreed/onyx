@@ -37,6 +37,11 @@ Keyboard :: struct {
     holding_cmd:   bool,
 }
 
+MouseCursors :: struct {
+    default: ^sdl.Cursor,
+    text:    ^sdl.Cursor,
+}
+
 Editor :: struct {
     running:           bool,
     fps_timer_prev:    u64,
@@ -49,6 +54,8 @@ Editor :: struct {
     keyboard:          Keyboard,
     buffers:           [dynamic]Buffer,
     active_buffer:     ^Buffer,
+    mouse_pos:         vec2i,
+    mouse_cursors:     MouseCursors,
 }
 
 editor := Editor {
@@ -266,6 +273,31 @@ show_open_file_dialog :: proc(window: ^sdl.Window) {
     sdl.ShowOpenFileDialog(open_file_callback, nil, window, nil, 0, "", false)
 }
 
+mouse_cursors_init :: proc() {
+    default := sdl.SystemCursor.DEFAULT
+    text := sdl.SystemCursor.TEXT
+    editor.mouse_cursors.default = sdl.CreateSystemCursor(default)
+    editor.mouse_cursors.text = sdl.CreateSystemCursor(text)
+    ok := sdl.SetCursor(editor.mouse_cursors.default)
+}
+
+mouse_cursors_set :: proc(c: ^sdl.Cursor) {
+    cursor_ok := sdl.SetCursor(c)
+    if !cursor_ok {
+        fmt.println("[ERROR]: Failed to set mouse cursor")
+    }
+}
+
+mouse_cursors_update :: proc() {
+    mouse_x, mouse_y: f32
+    mouse_pos := sdl.GetGlobalMouseState(&mouse_x, &mouse_y)
+    editor.mouse_pos.x = i32(mouse_x)
+    editor.mouse_pos.y = i32(mouse_y)
+    if point_in_rect(editor.mouse_pos, editor.active_buffer.viewbounds) {
+        mouse_cursors_set(editor.mouse_cursors.text)
+    }
+}
+
 main :: proc() {
     sdl_window, sdl_renderer := sdl_init()
     active_buffers := make([dynamic]Buffer); defer delete(active_buffers)
@@ -278,13 +310,15 @@ main :: proc() {
         fmt.println("[ERROR]: Failed to start text input")
     }
     treesitter_init()
+    mouse_cursors_init()
     load_buffer(LOADED_FILE)
 
     for (editor.running) {
         sdl_poll_events(sdl_window, editor.active_buffer)
         camera_update(sdl_window, editor.active_buffer)
         cursor_update(editor.active_buffer)
-        sdl.GetWindowSizeInPixels(sdl_window, &editor.active_buffer.viewbounds.x, &editor.active_buffer.viewbounds.y)
+        buffer_update(sdl_window, editor.active_buffer)
+        mouse_cursors_update()
 
         bg_color := hex_to_sdl_color(editor.current_theme._bg)
         sdl.SetRenderDrawColor(sdl_renderer, bg_color.r, bg_color.g, bg_color.b, bg_color.a)

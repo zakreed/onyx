@@ -17,10 +17,10 @@ Cursor :: struct {
 // TODO: Add some polish to this. You can also click on a line that is mostly offscreen and the camera doesn't move it fully into view.
 // 		 Scrolling when the cursor is already out of the scroll margin causes issues too.
 _cursor_move_cursor_on_screen :: proc(window: ^sdl.Window, buffer: ^Buffer, x, y: i32) {
-    lines_on_screen := (buffer.viewbounds.y - BUFFER_PADDING) / i32(get_line_height(window))
+    lines_on_screen := (buffer.viewbounds.h - BUFFER_PADDING) / get_line_height(window)
     cursor_screen_pos_y := buffer.cursor.pos.y - (i32(buffer.viewport_offset.y) / i32(get_line_height(window)))
 
-    if y > 0 && cursor_screen_pos_y > lines_on_screen - SCROLL_MARGIN {
+    if y > 0 && f32(cursor_screen_pos_y) > lines_on_screen - SCROLL_MARGIN {
         buffer.viewport_offset.y += get_line_height(window)
     }
     if y < 0 && cursor_screen_pos_y < SCROLL_MARGIN - BUFFER_PADDING / i32(get_line_height(window)) {

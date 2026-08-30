@@ -11,7 +11,7 @@ Buffer :: struct {
     data:            [dynamic]string,
     filename:        string,
     cursor:          Cursor,
-    viewbounds:      vec2i,
+    viewbounds:      sdl.FRect,
     viewport_offset: vec2,
 }
 
@@ -24,7 +24,7 @@ glyph_map_new :: proc(renderer: ^sdl.Renderer, font: ^ttf.Font) -> map[rune]^sdl
         text := ttf.RenderText_Blended(font, crune, 0, COLOR_WHITE)
         texture := sdl.CreateTextureFromSurface(renderer, text)
         if texture == nil {
-            fmt.println("Failed to create texture for glyph", glyph)
+            fmt.println("[ERROR]: Failed to create texture for glyph", glyph)
         }
         glyph_map[glyph] = texture
     }
@@ -82,7 +82,6 @@ buffer_remove_line :: proc(buffer: ^Buffer) {
     ordered_remove(&buffer.data, buffer.cursor.pos.y)
     if buffer.cursor.pos.y != 0 {
         text_on_line_above := buffer.data[buffer.cursor.pos.y - 1]
-        fmt.println(len(text_on_line_above))
         cursor_move(buffer, x = i32(len(text_on_line_above)), y = buffer.cursor.pos.y - 1)
         buffer.data[buffer.cursor.pos.y] = fmt.aprintf("%v%v", text_on_line_above, prev_line_content)
     } else {
@@ -145,6 +144,16 @@ buffer_draw_char :: proc(renderer: ^sdl.Renderer, buffer: ^Buffer, text: string,
     }
 }
 
+buffer_update :: proc(window: ^sdl.Window, buffer: ^Buffer) {
+    x, y, w, h: i32
+    sdl.GetWindowPosition(window, &x, &y)
+    sdl.GetWindowSizeInPixels(window, &w, &h)
+    buffer.viewbounds.x = f32(x)
+    buffer.viewbounds.y = f32(y)
+    buffer.viewbounds.w = f32(w)
+    buffer.viewbounds.h = f32(h)
+}
+
 buffer_draw :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buffer: ^Buffer) {
     if editor.treesitter.outdated {
         treesitter_generate_color_list()
@@ -152,12 +161,21 @@ buffer_draw :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buffer: ^Buffe
     }
 
     start_draw_line := i32(buffer.viewport_offset.y / get_line_height(window)) - 2
-    end_draw_line :=
-        (buffer.viewbounds.y) / i32(get_line_height(window)) + i32(buffer.viewport_offset.y / get_line_height(window))
+    end_draw_line := (buffer.viewbounds.h) / get_line_height(window) + buffer.viewport_offset.y / get_line_height(window)
+
+    highlight_rect := sdl.FRect {
+        x = buffer.viewport_offset.x,
+        y = ((f32(buffer.cursor.pos.y) * get_line_height(window)) + BUFFER_PADDING - 3) - buffer.viewport_offset.y,
+        w = buffer.viewbounds.w,
+        h = get_line_height(window),
+    }
+    highlight_color := hex_to_sdl_color(editor.current_theme._cursor_highlight)
+    sdl.SetRenderDrawColor(renderer, highlight_color.r, highlight_color.g, highlight_color.b, highlight_color.a)
+    sdl.RenderFillRect(renderer, &highlight_rect)
 
     char_byte := 0
     for line, i in buffer.data {
-        if i32(i) < start_draw_line || i32(i) > end_draw_line {
+        if i32(i) < start_draw_line || i > int(end_draw_line) {
             char_byte += len(line) + 1
             continue
         }

@@ -27,3 +27,22 @@ world_to_screen_pos :: proc {
     world_to_screen_pos_f32,
     world_to_screen_pos_i32,
 }
+
+point_in_rect_f32 :: proc(point: vec2i, rect: sdl.FRect) -> bool {
+    if f32(point.x) >= rect.x && f32(point.x) <= rect.x + rect.w && f32(point.y) >= rect.y && f32(point.y) <= rect.y + rect.h {
+        return true
+    }
+    return false
+}
+
+point_in_rect_i32 :: proc(point: vec2, rect: sdl.FRect) -> bool {
+    if point.x >= rect.x && point.x <= rect.x + rect.w && point.y >= rect.y && point.y <= rect.y + rect.h {
+        return true
+    }
+    return false
+}
+
+point_in_rect :: proc {
+    point_in_rect_f32,
+    point_in_rect_i32,
+}
