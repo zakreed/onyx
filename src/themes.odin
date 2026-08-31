@@ -91,6 +91,7 @@ theme_gruvbox_dark := Theme {
 theme_github_light := Theme {
     _bg                    = "FFFFFF",
     _cursor                = "1F2329",
+    _cursor_highlight      = "F6F8FA",
     _pre_proc              = "1F2329",
     _include               = "CF212E",
     _keyword               = "CF212E",
@@ -130,6 +131,11 @@ theme_github_light := Theme {
 }
 
 hex_to_sdl_color :: proc(hex_color: string) -> sdl.Color {
+    if hex_color == "" {
+        fmt.println("[WARNING]: Passed in empty color to hex_to_sdl_color()")
+        return sdl.Color{255, 0, 255, 255}
+    }
+
     base := strings.to_lower(hex_color); defer delete(base)
     for char in base {
         if !strings.contains_rune("1234567890abcdef", char) {
