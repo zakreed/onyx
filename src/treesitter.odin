@@ -187,6 +187,15 @@ _pos_to_byte :: proc(buffer: []string, pos: vec2i) -> int {
     return byte + int(pos.x)
 }
 
+// regenerates the entire tree from source
+treesitter_renew_tree :: proc(buffer: ^Buffer) {
+    raw_file_data, load_ok := os.read_entire_file(LOADED_FILE, context.allocator)
+    source := string(raw_file_data)
+    editor.treesitter.source = source
+    editor.treesitter.tree = ts.parser_parse_string(editor.treesitter.parser, source)
+    ts.parser_parse_string(editor.treesitter.parser, source)
+}
+
 treesitter_update :: proc(buffer: ^Buffer) {
     previous_buffer_data := strings.split_lines(editor.treesitter.source)
     defer delete(previous_buffer_data)

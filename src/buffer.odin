@@ -2,17 +2,19 @@ package main
 
 import "core:fmt"
 import "core:math"
+import "core:os"
 import "core:strings"
 import "core:unicode/utf8"
 import sdl "vendor:sdl3"
 import ttf "vendor:sdl3/ttf"
 
 Buffer :: struct {
-    data:            [dynamic]string,
-    filename:        string,
-    cursor:          Cursor,
-    viewbounds:      sdl.FRect,
-    viewport_offset: vec2,
+    data:                [dynamic]string,
+    filename:            string,
+    cursor:              Cursor,
+    viewbounds:          sdl.FRect,
+    viewport_offset:     vec2,
+    has_unsaved_changes: bool,
 }
 
 glyph_map_new :: proc(renderer: ^sdl.Renderer, font: ^ttf.Font) -> map[rune]^sdl.Texture {
@@ -51,6 +53,7 @@ buffer_insert :: proc(buffer: ^Buffer, char: string) {
     buffer.data[int(buffer.cursor.pos.y)] = strings.to_string(builder)
     cursor_move(buffer, x = buffer.cursor.pos.x + 1)
     treesitter_update(buffer)
+    buffer.has_unsaved_changes = true
 }
 
 buffer_remove_at_cursor :: proc(buffer: ^Buffer) {
@@ -65,6 +68,7 @@ buffer_remove_at_cursor :: proc(buffer: ^Buffer) {
 
     buffer.data[int(buffer.cursor.pos.y)] = strings.to_string(builder)
     cursor_move(buffer, x = buffer.cursor.pos.x - 1)
+    buffer.has_unsaved_changes = true
 }
 
 buffer_insert_newline :: proc(buffer: ^Buffer) {
@@ -75,6 +79,7 @@ buffer_insert_newline :: proc(buffer: ^Buffer) {
     buffer.data[buffer.cursor.pos.y] = text_before_cursor
     inject_at(&buffer.data, buffer.cursor.pos.y + 1, text_beyond_cursor)
     cursor_move(buffer, x = 0, y = buffer.cursor.pos.y + 1)
+    buffer.has_unsaved_changes = true
 }
 
 buffer_remove_line :: proc(buffer: ^Buffer) {
@@ -87,6 +92,7 @@ buffer_remove_line :: proc(buffer: ^Buffer) {
     } else {
         cursor_move(buffer, x = i32(len(buffer.data[buffer.cursor.pos.y])))
     }
+    buffer.has_unsaved_changes = true
 }
 
 buffer_remove_line_content :: proc(buffer: ^Buffer) {
@@ -94,6 +100,18 @@ buffer_remove_line_content :: proc(buffer: ^Buffer) {
     text_beyond_cursor := current_line[buffer.cursor.pos.x:]
     buffer.data[buffer.cursor.pos.y] = text_beyond_cursor
     cursor_move(buffer, x = 0)
+    buffer.has_unsaved_changes = true
+}
+
+buffer_load :: proc(filename: string) {
+    raw_file_data, load_ok := os.read_entire_file(filename, context.allocator)
+    data := string(raw_file_data)
+    data_lines := strings.split_lines(data)
+    append(&editor.buffers, Buffer{filename = filename})
+    editor.active_buffer = &editor.buffers[len(editor.buffers) - 1]
+    for line, i in data_lines {
+        append(&editor.active_buffer.data, line)
+    }
 }
 
 buffer_to_string :: proc(buffer: ^Buffer) -> string {
@@ -125,6 +143,18 @@ buffer_handle_input :: proc(buffer: ^Buffer, char: cstring) {
         cursor_move(buffer, x = buffer.cursor.pos.x - 1)
     }
     // treesitter_update(buffer)
+}
+
+buffer_save :: proc(buffer: ^Buffer) {
+    buffer_string := buffer_to_string(buffer)
+    defer delete(buffer_string)
+    err := os.write_entire_file(buffer.filename, buffer_string)
+    if err != nil {
+        fmt.println("[ERROR]: Failed to save file", buffer.filename)
+    }
+    treesitter_renew_tree(buffer)
+    buffer.has_unsaved_changes = false
+    fmt.println("written to", buffer.filename)
 }
 
 buffer_draw_char :: proc(renderer: ^sdl.Renderer, buffer: ^Buffer, text: string, pos: vec2, color: sdl.Color) {

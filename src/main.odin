@@ -1,5 +1,7 @@
 package main
 
+// this is some more text
+
 import "base:runtime"
 import "core:c"
 import "core:fmt"
@@ -44,6 +46,7 @@ MouseCursors :: struct {
 
 Editor :: struct {
     running:           bool,
+    requested_exit:    bool,
     fps_timer_prev:    u64,
     fps:               int,
     dt:                f32,
@@ -58,9 +61,15 @@ Editor :: struct {
     mouse_cursors:     MouseCursors,
 }
 
+SaveModalOption :: enum {
+    SAVE,
+    DISCARD,
+    CANCEL,
+}
+
 editor := Editor {
     running        = true,
-    current_theme  = theme_gruvbox_dark,
+    current_theme  = theme_github_light,
     fps_timer_prev = sdl.GetPerformanceCounter(),
 }
 
@@ -69,17 +78,6 @@ calc_frame_info :: proc() {
     editor.dt = (f32(fps_timer_now - editor.fps_timer_prev)) / f32(sdl.GetPerformanceFrequency())
     editor.fps = int(1 / editor.dt)
     editor.fps_timer_prev = fps_timer_now
-}
-
-load_buffer :: proc(filename: string) {
-    raw_file_data, load_ok := os.read_entire_file(filename, context.allocator)
-    data := string(raw_file_data)
-    data_lines := strings.split_lines(data)
-    append(&editor.buffers, Buffer{})
-    editor.active_buffer = &editor.buffers[len(editor.buffers) - 1]
-    for line, i in data_lines {
-        append(&editor.active_buffer.data, line)
-    }
 }
 
 sdl_init :: proc() -> (^sdl.Window, ^sdl.Renderer) {
@@ -117,7 +115,7 @@ sdl_poll_events :: proc(window: ^sdl.Window, buffer: ^Buffer) {
     for sdl.PollEvent(&event) {
         #partial switch event.type {
         case .QUIT:
-            editor.running = false
+            editor.requested_exit = true
         case .TEXT_INPUT:
             buffer_handle_input(buffer, event.text.text)
         case .KEY_DOWN:
@@ -168,8 +166,11 @@ sdl_poll_events :: proc(window: ^sdl.Window, buffer: ^Buffer) {
 
             case .O:
                 if editor.keyboard.holding_cmd {
-                    fmt.println("hello")
                     show_open_file_dialog(window)
+                }
+            case .S:
+                if editor.keyboard.holding_cmd {
+                    buffer_save(editor.active_buffer)
                 }
             }
 
@@ -240,11 +241,11 @@ get_character_spacing :: proc(window: ^sdl.Window) -> f32 {
     return CHARACTER_SPACING * sdl.GetWindowPixelDensity(window)
 }
 
-show_unsaved_changes_dialog :: proc(window: ^sdl.Window) -> int {
+show_unsaved_changes_dialog :: proc(window: ^sdl.Window) -> SaveModalOption {
     buttons := []sdl.MessageBoxButtonData {
-        {flags = {.RETURNKEY_DEFAULT}, buttonID = 0, text = "Save"},
-        {flags = nil, buttonID = 1, text = "Discard"},
-        {flags = {.ESCAPEKEY_DEFAULT}, buttonID = 2, text = "Cancel"},
+        {flags = {.RETURNKEY_DEFAULT}, buttonID = i32(SaveModalOption.SAVE), text = "Save"},
+        {flags = nil, buttonID = i32(SaveModalOption.DISCARD), text = "Discard"},
+        {flags = {.ESCAPEKEY_DEFAULT}, buttonID = i32(SaveModalOption.CANCEL), text = "Cancel"},
     }
     data := sdl.MessageBoxData {
         flags      = {.WARNING},
@@ -258,14 +259,14 @@ show_unsaved_changes_dialog :: proc(window: ^sdl.Window) -> int {
 
     sdl.ShowMessageBox(data, &button_id)
 
-    return int(button_id)
+    return SaveModalOption(button_id)
 }
 
 open_file_callback :: proc "c" (userdata: rawptr, filelist: [^]cstring, filter: c.int) {
     context = runtime.default_context()
     if filelist != nil {
         file_path := string(filelist[0])
-        load_buffer(file_path)
+        buffer_load(file_path)
     }
 }
 
@@ -298,6 +299,13 @@ mouse_cursors_update :: proc() {
     }
 }
 
+new_function :: proc() -> int {
+    x := 10
+    y := 34
+
+    return x + y
+}
+
 main :: proc() {
     sdl_window, sdl_renderer := sdl_init()
     active_buffers := make([dynamic]Buffer); defer delete(active_buffers)
@@ -311,7 +319,7 @@ main :: proc() {
     }
     treesitter_init()
     mouse_cursors_init()
-    load_buffer(LOADED_FILE)
+    buffer_load(LOADED_FILE)
 
     for (editor.running) {
         sdl_poll_events(sdl_window, editor.active_buffer)
@@ -332,8 +340,25 @@ main :: proc() {
         sdl.SetWindowTitle(sdl_window, fmt.ctprintf("Editor - %vfps", editor.fps))
         sdl.RenderPresent(sdl_renderer)
         calc_frame_info()
+
+        if editor.requested_exit {
+            if editor.active_buffer.has_unsaved_changes {
+                save_modal_option := show_unsaved_changes_dialog(sdl_window)
+                #partial switch save_modal_option {
+                case .SAVE:
+                    buffer_save(editor.active_buffer)
+                    editor.running = false
+                case .DISCARD:
+                    editor.running = false
+                case .CANCEL:
+                    editor.requested_exit = false
+                }
+            } else {
+                editor.running = false
+            }
+        }
+
         free_all(context.temp_allocator)
     }
-
-    // unsaved_value := show_unsaved_changes_dialog()
 }
+
