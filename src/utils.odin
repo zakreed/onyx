@@ -1,5 +1,6 @@
 package main
 
+import "core:strings"
 import sdl "vendor:sdl3"
 
 screen_to_world_pos_f32 :: proc(window: ^sdl.Window, buffer: ^Buffer, pos: vec2) -> vec2 {
@@ -45,4 +46,17 @@ point_in_rect_i32 :: proc(point: vec2, rect: sdl.FRect) -> bool {
 point_in_rect :: proc {
     point_in_rect_f32,
     point_in_rect_i32,
+}
+
+filename_from_path :: proc(path: string) -> string {
+    split_path := strings.split(path, "/")
+    defer delete(split_path)
+    filename: string
+    if len(split_path) >= 1 {
+        filename = split_path[len(split_path) - 1]
+    } else {
+        filename = path
+    }
+
+    return filename
 }

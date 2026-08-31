@@ -1,7 +1,5 @@
 package main
 
-// this is some more text
-
 import "base:runtime"
 import "core:c"
 import "core:fmt"
@@ -299,13 +297,6 @@ mouse_cursors_update :: proc() {
     }
 }
 
-new_function :: proc() -> int {
-    x := 10
-    y := 34
-
-    return x + y
-}
-
 main :: proc() {
     sdl_window, sdl_renderer := sdl_init()
     active_buffers := make([dynamic]Buffer); defer delete(active_buffers)
@@ -320,6 +311,7 @@ main :: proc() {
     treesitter_init()
     mouse_cursors_init()
     buffer_load(LOADED_FILE)
+    sdl.SetWindowTitle(sdl_window, fmt.ctprint(filename_from_path(LOADED_FILE)))
 
     for (editor.running) {
         sdl_poll_events(sdl_window, editor.active_buffer)
@@ -337,7 +329,6 @@ main :: proc() {
         sdl.SetRenderDrawColor(sdl_renderer, cursor_color.r, cursor_color.g, cursor_color.b, cursor_color.a)
         cursor_draw(sdl_window, sdl_renderer, editor.active_buffer)
 
-        sdl.SetWindowTitle(sdl_window, fmt.ctprintf("Editor - %vfps", editor.fps))
         sdl.RenderPresent(sdl_renderer)
         calc_frame_info()
 
@@ -361,4 +352,3 @@ main :: proc() {
         free_all(context.temp_allocator)
     }
 }
-
