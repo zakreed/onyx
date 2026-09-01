@@ -129,20 +129,16 @@ buffer_handle_input :: proc(buffer: ^Buffer, char: cstring) {
     buffer_insert(buffer, fmt.tprint(char))
     if char == fmt.ctprint('{') {
         buffer_insert(buffer, "}")
-        // treesitter_update(buffer)
         cursor_move(buffer, x = buffer.cursor.pos.x - 1)
     }
     if char == fmt.ctprint('(') {
         buffer_insert(buffer, ")")
-        // treesitter_update(buffer)
         cursor_move(buffer, x = buffer.cursor.pos.x - 1)
     }
     if char == fmt.ctprint('[') {
         buffer_insert(buffer, "]")
-        // treesitter_update(buffer)
         cursor_move(buffer, x = buffer.cursor.pos.x - 1)
     }
-    // treesitter_update(buffer)
 }
 
 buffer_save :: proc(buffer: ^Buffer) {
