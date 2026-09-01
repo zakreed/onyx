@@ -4,8 +4,6 @@ import "base:runtime"
 import "core:c"
 import "core:fmt"
 import "core:math"
-import "core:os"
-import "core:strings"
 import sdl "vendor:sdl3"
 import ttf "vendor:sdl3/ttf"
 
@@ -17,8 +15,8 @@ FONT_SIZE :: 12
 LINE_HEIGHT :: 20
 CHARACTER_SPACING :: 8
 TAB_WIDTH :: 4
-SCROLL_SPEED :: 200
-SCROLL_FRICTION :: 10
+SCROLL_SPEED :: 6
+SCROLL_FRICTION :: 0.2
 SCROLL_MARGIN :: 3
 LOADED_FILE :: "src/main.odin"
 vec2 :: [2]f32
@@ -66,9 +64,8 @@ SaveModalOption :: enum {
 }
 
 editor := Editor {
-    running        = true,
-    current_theme  = theme_github_light,
-    fps_timer_prev = sdl.GetPerformanceCounter(),
+    running       = true,
+    current_theme = theme_gruvbox_dark,
 }
 
 calc_frame_info :: proc() {
@@ -94,8 +91,8 @@ sdl_init :: proc() -> (^sdl.Window, ^sdl.Renderer) {
 }
 
 camera_update :: proc(window: ^sdl.Window, buffer: ^Buffer) {
-    buffer.viewport_offset.x += editor.camera_scroll_vel.x * f32(editor.dt)
-    buffer.viewport_offset.y += editor.camera_scroll_vel.y * f32(editor.dt)
+    buffer.viewport_offset.x += editor.camera_scroll_vel.x
+    buffer.viewport_offset.y += editor.camera_scroll_vel.y
 
     if buffer.viewport_offset.y < 0 {
         buffer.viewport_offset.y = 0
@@ -104,102 +101,117 @@ camera_update :: proc(window: ^sdl.Window, buffer: ^Buffer) {
         buffer.viewport_offset.y = f32(len(buffer.data)) * get_line_height(window)
     }
 
-    editor.camera_scroll_vel.x = math.lerp(editor.camera_scroll_vel.x, f32(0), f32(SCROLL_FRICTION) * f32(editor.dt))
-    editor.camera_scroll_vel.y = math.lerp(editor.camera_scroll_vel.y, f32(0), f32(SCROLL_FRICTION) * f32(editor.dt))
+    editor.camera_scroll_vel.x = math.lerp(editor.camera_scroll_vel.x, f32(0), f32(SCROLL_FRICTION))
+    editor.camera_scroll_vel.y = math.lerp(editor.camera_scroll_vel.y, f32(0), f32(SCROLL_FRICTION))
+    if math.abs(editor.camera_scroll_vel.x) < 0.001 {editor.camera_scroll_vel.x = 0}
+    if math.abs(editor.camera_scroll_vel.y) < 0.001 {editor.camera_scroll_vel.y = 0}
+}
+
+sdl_handle_event :: proc(window: ^sdl.Window, buffer: ^Buffer, event: sdl.Event) {
+    #partial switch event.type {
+    case .QUIT:
+        editor.requested_exit = true
+    case .TEXT_INPUT:
+        buffer_handle_input(buffer, event.text.text)
+    case .KEY_DOWN:
+        editor.treesitter.outdated = true
+        #partial switch event.key.scancode {
+        case .TAB:
+            for i in 0 ..< TAB_WIDTH {
+                buffer_insert(buffer, " ")
+            }
+        case .LGUI:
+            editor.keyboard.holding_cmd = true
+        case .BACKSPACE:
+            if buffer.cursor.pos == 0 {return}
+            if buffer.cursor.pos.x == 0 {
+                buffer_remove_line(buffer)
+            } else {
+                if editor.keyboard.holding_cmd {
+                    buffer_remove_line_content(buffer)
+                } else {
+                    buffer_remove_at_cursor(buffer)
+                }
+            }
+            treesitter_update(buffer)
+        case .RETURN:
+            buffer_insert_newline(buffer)
+            if buffer.cursor.pos != 0 {
+                spaces_before_content_on_prev_line := 0
+                for char in buffer.data[buffer.cursor.pos.y - 1] {
+                    if char == ' ' {
+                        spaces_before_content_on_prev_line += 1
+                    } else {
+                        break
+                    }
+                }
+                for i in 0 ..< spaces_before_content_on_prev_line {
+                    buffer_insert(buffer, " ")
+                }
+            }
+            treesitter_update(buffer)
+        case .DOWN:
+            cursor_move(buffer, y = buffer.cursor.pos.y + 1)
+        case .UP:
+            cursor_move(buffer, y = buffer.cursor.pos.y - 1)
+        case .LEFT:
+            cursor_move(buffer, x = buffer.cursor.pos.x - 1)
+        case .RIGHT:
+            cursor_move(buffer, x = buffer.cursor.pos.x + 1)
+
+        case .O:
+            if editor.keyboard.holding_cmd {
+                show_open_file_dialog(window)
+            }
+        case .S:
+            if editor.keyboard.holding_cmd {
+                buffer_save(editor.active_buffer)
+            }
+        }
+
+    case .KEY_UP:
+        #partial switch event.key.scancode {
+        case .LGUI:
+            editor.keyboard.holding_cmd = false
+        }
+    case .MOUSE_WHEEL:
+        if event.wheel.y != 0 {
+            editor.camera_scroll_vel.y -= event.wheel.y * SCROLL_SPEED
+        }
+    case .MOUSE_BUTTON_DOWN:
+        if event.button.button == 1 {
+            pos := screen_to_world_pos(window, buffer, vec2{event.button.x, event.button.y})
+            line_number := int(math.floor((pos.y - BUFFER_PADDING) / get_line_height(window)))
+            col_number := int(math.floor(pos.x - BUFFER_PADDING) / get_character_spacing(window))
+
+            if line_number >= len(buffer.data) {
+                cursor_move(buffer, y = i32(len(buffer.data)) - 1)
+            } else if line_number >= 0 {
+                cursor_move(buffer, y = i32(line_number))
+            }
+
+            if col_number >= len(buffer.data[buffer.cursor.pos.y]) {
+                cursor_move(buffer, x = i32(len(buffer.data[buffer.cursor.pos.y])))
+            } else if col_number >= 0 {
+                cursor_move(buffer, x = i32(col_number))
+            }
+        }
+    }
 }
 
 sdl_poll_events :: proc(window: ^sdl.Window, buffer: ^Buffer) {
+    is_animating := editor.camera_scroll_vel.x != 0 || editor.camera_scroll_vel.y != 0
     event: sdl.Event
-    for sdl.PollEvent(&event) {
-        #partial switch event.type {
-        case .QUIT:
-            editor.requested_exit = true
-        case .TEXT_INPUT:
-            buffer_handle_input(buffer, event.text.text)
-        case .KEY_DOWN:
-            editor.treesitter.outdated = true
-            #partial switch event.key.scancode {
-            case .TAB:
-                for i in 0 ..< TAB_WIDTH {
-                    buffer_insert(buffer, " ")
-                }
-            case .LGUI:
-                editor.keyboard.holding_cmd = true
-            case .BACKSPACE:
-                if buffer.cursor.pos == 0 {return}
-                if buffer.cursor.pos.x == 0 {
-                    buffer_remove_line(buffer)
-                } else {
-                    if editor.keyboard.holding_cmd {
-                        buffer_remove_line_content(buffer)
-                    } else {
-                        buffer_remove_at_cursor(buffer)
-                    }
-                }
-                treesitter_update(buffer)
-            case .RETURN:
-                buffer_insert_newline(buffer)
-                if buffer.cursor.pos != 0 {
-                    spaces_before_content_on_prev_line := 0
-                    for char in buffer.data[buffer.cursor.pos.y - 1] {
-                        if char == ' ' {
-                            spaces_before_content_on_prev_line += 1
-                        } else {
-                            break
-                        }
-                    }
-                    for i in 0 ..< spaces_before_content_on_prev_line {
-                        buffer_insert(buffer, " ")
-                    }
-                }
-                treesitter_update(buffer)
-            case .DOWN:
-                cursor_move(buffer, y = buffer.cursor.pos.y + 1)
-            case .UP:
-                cursor_move(buffer, y = buffer.cursor.pos.y - 1)
-            case .LEFT:
-                cursor_move(buffer, x = buffer.cursor.pos.x - 1)
-            case .RIGHT:
-                cursor_move(buffer, x = buffer.cursor.pos.x + 1)
+    got_event: bool
+    if is_animating {
+        got_event = sdl.WaitEventTimeout(&event, 0)
+    } else {
+        got_event = sdl.WaitEvent(&event)
+    }
 
-            case .O:
-                if editor.keyboard.holding_cmd {
-                    show_open_file_dialog(window)
-                }
-            case .S:
-                if editor.keyboard.holding_cmd {
-                    buffer_save(editor.active_buffer)
-                }
-            }
-
-        case .KEY_UP:
-            #partial switch event.key.scancode {
-            case .LGUI:
-                editor.keyboard.holding_cmd = false
-            }
-        case .MOUSE_WHEEL:
-            if event.wheel.y != 0 {
-                editor.camera_scroll_vel.y -= event.wheel.y * SCROLL_SPEED
-            }
-        case .MOUSE_BUTTON_DOWN:
-            if event.button.button == 1 {
-                pos := screen_to_world_pos(window, buffer, vec2{event.button.x, event.button.y})
-                line_number := int(math.floor((pos.y - BUFFER_PADDING) / get_line_height(window)))
-                col_number := int(math.floor(pos.x - BUFFER_PADDING) / get_character_spacing(window))
-
-                if line_number >= len(buffer.data) {
-                    cursor_move(buffer, y = i32(len(buffer.data)) - 1)
-                } else if line_number >= 0 {
-                    cursor_move(buffer, y = i32(line_number))
-                }
-
-                if col_number >= len(buffer.data[buffer.cursor.pos.y]) {
-                    cursor_move(buffer, x = i32(len(buffer.data[buffer.cursor.pos.y])))
-                } else if col_number >= 0 {
-                    cursor_move(buffer, x = i32(col_number))
-                }
-            }
-        }
+    for got_event {
+        sdl_handle_event(window, buffer, event)
+        got_event = sdl.PollEvent(&event)
     }
 }
 
@@ -314,6 +326,7 @@ main :: proc() {
     sdl.SetWindowTitle(sdl_window, fmt.ctprint(filename_from_path(LOADED_FILE)))
 
     for (editor.running) {
+        calc_frame_info()
         sdl_poll_events(sdl_window, editor.active_buffer)
         camera_update(sdl_window, editor.active_buffer)
         cursor_update(editor.active_buffer)
@@ -330,7 +343,6 @@ main :: proc() {
         cursor_draw(sdl_window, sdl_renderer, editor.active_buffer)
 
         sdl.RenderPresent(sdl_renderer)
-        calc_frame_info()
 
         if editor.requested_exit {
             if editor.active_buffer.has_unsaved_changes {

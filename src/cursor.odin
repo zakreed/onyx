@@ -106,7 +106,6 @@ cursor_update :: proc(buffer: ^Buffer) {
         buffer.cursor.has_just_moved = false
     }
 
-    buffer.cursor.blink_timer += editor.dt
     if buffer.cursor.blink_timer > CURSOR_BLINK_DURATION {
         buffer.cursor.visible = !buffer.cursor.visible
         buffer.cursor.blink_timer = 0
