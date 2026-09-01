@@ -116,7 +116,8 @@ cursor_draw :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buffer: ^Buffe
     if !buffer.cursor.visible {return}
 
     rect := sdl.FRect {
-        x = ((f32(buffer.cursor.pos.x) * get_character_spacing(window)) + BUFFER_PADDING) - buffer.viewport_offset.x,
+        x = ((f32(buffer.cursor.pos.x) * get_character_spacing(window)) +
+            BUFFER_PADDING) - buffer.viewport_offset.x + (editor.line_number_section_width + BUFFER_PADDING),
         y = ((f32(buffer.cursor.pos.y) * get_line_height(window)) + BUFFER_PADDING - 3) - buffer.viewport_offset.y,
         w = 2,
         h = get_line_height(window),

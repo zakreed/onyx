@@ -25,7 +25,7 @@ vec2i :: [2]i32
 COLOR_WHITE :: sdl.Color{255, 255, 255, 255}
 COLOR_GRAY :: sdl.Color{128, 128, 128, 255}
 COLOR_BLACK :: sdl.Color{0, 0, 0, 255}
-BUFFER_PADDING :: 32
+BUFFER_PADDING :: 24
 GUTTER_PADDING :: 48
 
 Keyboard :: struct {
@@ -41,20 +41,21 @@ MouseCursors :: struct {
 }
 
 Editor :: struct {
-    running:           bool,
-    requested_exit:    bool,
-    fps_timer_prev:    u64,
-    fps:               int,
-    dt:                f32,
-    glyph_map:         map[rune]^sdl.Texture,
-    camera_scroll_vel: vec2,
-    treesitter:        Treesitter,
-    current_theme:     Theme,
-    keyboard:          Keyboard,
-    buffers:           [dynamic]Buffer,
-    active_buffer:     ^Buffer,
-    mouse_pos:         vec2i,
-    mouse_cursors:     MouseCursors,
+    running:                   bool,
+    requested_exit:            bool,
+    fps_timer_prev:            u64,
+    fps:                       int,
+    dt:                        f32,
+    glyph_map:                 map[rune]^sdl.Texture,
+    camera_scroll_vel:         vec2,
+    treesitter:                Treesitter,
+    current_theme:             Theme,
+    keyboard:                  Keyboard,
+    buffers:                   [dynamic]Buffer,
+    active_buffer:             ^Buffer,
+    mouse_pos:                 vec2i,
+    mouse_cursors:             MouseCursors,
+    line_number_section_width: f32,
 }
 
 SaveModalOption :: enum {
@@ -182,7 +183,9 @@ sdl_handle_event :: proc(window: ^sdl.Window, buffer: ^Buffer, event: sdl.Event)
         if event.button.button == 1 {
             pos := screen_to_world_pos(window, buffer, vec2{event.button.x, event.button.y})
             line_number := int(math.floor((pos.y - BUFFER_PADDING) / get_line_height(window)))
-            col_number := int(math.floor(pos.x - BUFFER_PADDING) / get_character_spacing(window))
+            col_number := int(
+                math.floor(pos.x - BUFFER_PADDING * 2 - editor.line_number_section_width) / get_character_spacing(window),
+            )
 
             if line_number >= len(buffer.data) {
                 cursor_move(buffer, y = i32(len(buffer.data)) - 1)
@@ -364,3 +367,4 @@ main :: proc() {
         free_all(context.temp_allocator)
     }
 }
+

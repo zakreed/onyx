@@ -3,6 +3,7 @@ package main
 import "core:fmt"
 import "core:math"
 import "core:os"
+import "core:strconv"
 import "core:strings"
 import "core:unicode/utf8"
 import sdl "vendor:sdl3"
@@ -180,6 +181,20 @@ buffer_update :: proc(window: ^sdl.Window, buffer: ^Buffer) {
     buffer.viewbounds.h = f32(h)
 }
 
+_buffer_draw_line_number :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buffer: ^Buffer, line: int, section_width: f32) {
+    xpos := BUFFER_PADDING + (section_width - f32(number_of_digits_in_int(line)) * get_character_spacing(window))
+    ypos := BUFFER_PADDING + (f32(line - 1) * get_line_height(window))
+    for digit, i in fmt.tprint(line) {
+        buffer_draw_char(
+            renderer,
+            buffer,
+            fmt.tprint(digit),
+            {xpos + f32(i) * get_character_spacing(window), ypos},
+            hex_to_sdl_color(editor.current_theme._line_numbers),
+        )
+    }
+}
+
 buffer_draw :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buffer: ^Buffer) {
     if editor.treesitter.outdated {
         treesitter_generate_color_list()
@@ -199,12 +214,15 @@ buffer_draw :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buffer: ^Buffe
     sdl.SetRenderDrawColor(renderer, highlight_color.r, highlight_color.g, highlight_color.b, highlight_color.a)
     sdl.RenderFillRect(renderer, &highlight_rect)
 
+    editor.line_number_section_width = f32(number_of_digits_in_int(len(buffer.data))) * get_character_spacing(window)
+
     char_byte := 0
     for line, i in buffer.data {
         if i32(i) < start_draw_line || i > int(end_draw_line) {
             char_byte += len(line) + 1
             continue
         }
+        _buffer_draw_line_number(window, renderer, buffer, i + 1, editor.line_number_section_width)
         for char, j in line {
             char_str := utf8.runes_to_string({char}, context.temp_allocator)
             color := treesitter_get_char_color(char_byte, char, i)
@@ -212,7 +230,10 @@ buffer_draw :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buffer: ^Buffe
                 renderer,
                 buffer,
                 char_str,
-                {f32(j) * get_character_spacing(window) + BUFFER_PADDING, f32(i) * get_line_height(window) + BUFFER_PADDING},
+                {
+                    f32(j) * get_character_spacing(window) + BUFFER_PADDING + editor.line_number_section_width + BUFFER_PADDING,
+                    f32(i) * get_line_height(window) + BUFFER_PADDING,
+                },
                 color,
             )
             char_byte += utf8.rune_size(char)

@@ -1,5 +1,6 @@
 package main
 
+import "core:math"
 import "core:strings"
 import sdl "vendor:sdl3"
 
@@ -59,4 +60,17 @@ filename_from_path :: proc(path: string) -> string {
     }
 
     return filename
+}
+
+number_of_digits_in_int :: proc(i: int) -> int {
+    if math.abs(i) < 10 {return 1}
+    if math.abs(i) < 100 {return 2}
+    if math.abs(i) < 1_000 {return 3}
+    if math.abs(i) < 10_000 {return 4}
+    if math.abs(i) < 100_000 {return 5}
+    if math.abs(i) < 1_000_000 {return 6}
+    if math.abs(i) < 10_000_000 {return 7}
+    if math.abs(i) < 100_000_000 {return 8}
+    if math.abs(i) < 1_000_000_000 {return 9}
+    return 10
 }
