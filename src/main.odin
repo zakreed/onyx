@@ -13,7 +13,7 @@ SCREEN_MIN_WIDTH :: 16 * 25
 SCREEN_MIN_HEIGHT :: 9 * 25
 FONT_SIZE :: 12
 LINE_HEIGHT :: 20
-CHARACTER_SPACING :: 8
+CHARACTER_SPACING :: 7
 TAB_WIDTH :: 4
 SCROLL_SPEED :: 6
 SCROLL_FRICTION :: 0.2
@@ -367,4 +367,3 @@ main :: proc() {
         free_all(context.temp_allocator)
     }
 }
-
