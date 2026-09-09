@@ -161,7 +161,8 @@ buffer_draw_char :: proc(renderer: ^sdl.Renderer, buffer: ^Buffer, text: string,
         sdl.GetTextureSize(texture, &w, &h)
         dst := sdl.FRect {
             x = math.round(pos.x - buffer.viewport_offset.x),
-            y = math.round(pos.y - buffer.viewport_offset.y),
+            // -1 here is a hack to just make the text look more centered in the line
+            y = math.round(pos.y - buffer.viewport_offset.y) - 1,
             w = w,
             h = h,
         }
