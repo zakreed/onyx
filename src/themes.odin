@@ -5,6 +5,7 @@ import "core:strings"
 import sdl "vendor:sdl3"
 
 Theme :: struct {
+    _default:               string,
     _bg:                    string,
     _cursor:                string,
     _cursor_highlight:      string,
@@ -48,11 +49,12 @@ Theme :: struct {
 }
 
 theme_gruvbox_dark := Theme {
+    _default               = "EBDBB2",
     _bg                    = "1D2021",
-    _cursor                = "FFFFFF",
+    _cursor                = "83A598",
     _cursor_highlight      = "282828",
     _line_numbers          = "665C54",
-    _pre_proc              = "FFFFFF",
+    _pre_proc              = "EBDBB2",
     _include               = "FB4934",
     _keyword               = "FB4934",
     _keyword_function      = "FB4934",
@@ -61,17 +63,17 @@ theme_gruvbox_dark := Theme {
     _conditional           = "FB4934",
     _conditional_ternary   = "FB4934",
     _repeat                = "FB4934",
-    _variable              = "FFFFFF",
-    _namespace             = "FFFFFF",
-    _constant              = "FFFFFF",
-    _parameter             = "FFFFFF",
+    _variable              = "EBDBB2",
+    _namespace             = "EBDBB2",
+    _constant              = "EBDBB2",
+    _parameter             = "EBDBB2",
     _type                  = "FABD2F",
     _function              = "B8BB26",
     _function_call         = "B8BB26",
     _type_builtin          = "FABD2F",
-    _field                 = "FFFFFF",
-    _function_macro        = "FFFFFF",
-    _attribute             = "FFFFFF",
+    _field                 = "EBDBB2",
+    _function_macro        = "EBDBB2",
+    _attribute             = "EBDBB2",
     _number                = "D3869B",
     _float                 = "D3869B",
     _string                = "B8BB26",
@@ -79,11 +81,11 @@ theme_gruvbox_dark := Theme {
     _string_escape         = "B8BB26",
     _boolean               = "D3869B",
     _constant_builtin      = "FABD2F",
-    _variable_builtin      = "FFFFFF",
+    _variable_builtin      = "EBDBB2",
     _operator              = "83A598",
-    _keyword_operator      = "FFFFFF",
+    _keyword_operator      = "EBDBB2",
     _punctuation_bracket   = "928374",
-    _punctuation_delimiter = "FFFFFF",
+    _punctuation_delimiter = "EBDBB2",
     _punctuation_special   = "928374",
     _comment               = "7C6F64",
     _spell                 = "7C6F64",
@@ -91,6 +93,7 @@ theme_gruvbox_dark := Theme {
 }
 
 theme_github_light := Theme {
+    _default               = "000000",
     _bg                    = "FFFFFF",
     _cursor                = "1F2329",
     _cursor_highlight      = "F6F8FA",
