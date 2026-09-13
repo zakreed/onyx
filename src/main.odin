@@ -134,7 +134,6 @@ sdl_handle_event :: proc(window: ^sdl.Window, buffer: ^Buffer, event: sdl.Event)
                     buffer_remove_at_cursor(buffer)
                 }
             }
-            treesitter_update(buffer)
         case .RETURN:
             buffer_insert_newline(buffer)
             if buffer.cursor.pos != 0 {
@@ -150,7 +149,6 @@ sdl_handle_event :: proc(window: ^sdl.Window, buffer: ^Buffer, event: sdl.Event)
                     buffer_insert(buffer, " ")
                 }
             }
-            treesitter_update(buffer)
         case .DOWN:
             cursor_move(buffer, y = buffer.cursor.pos.y + 1)
         case .UP:
@@ -316,7 +314,7 @@ main :: proc() {
     sdl_window, sdl_renderer := sdl_init()
     active_buffers := make([dynamic]Buffer); defer delete(active_buffers)
     ttf_init := ttf.Init(); assert(ttf_init)
-    font := ttf.OpenFont("GeistMono-Medium.ttf", get_font_size(sdl_window))
+    font := ttf.OpenFont("GeistMono-SemiBold.ttf", get_font_size(sdl_window))
     keyboard: Keyboard
     editor.glyph_map = glyph_map_new(sdl_renderer, font)
     ok := sdl.StartTextInput(sdl_window)

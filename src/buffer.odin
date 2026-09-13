@@ -18,6 +18,16 @@ Buffer :: struct {
     has_unsaved_changes: bool,
 }
 
+BufferEdit :: struct {
+    content:       string,
+    start_byte:    u32,
+    end_byte:      u32,
+    old_end_byte:  u32,
+    start_point:   vec2i,
+    end_point:     vec2i,
+    old_end_point: vec2i,
+}
+
 glyph_map_new :: proc(renderer: ^sdl.Renderer, font: ^ttf.Font) -> map[rune]^sdl.Texture {
     glyphs_to_generate := "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"!£$%^&*()-_=+[]{};:'@#~,./<>?\\|"
     glyph_map := map[rune]^sdl.Texture{}
@@ -45,6 +55,16 @@ glyph_map_destroy :: proc() {
 buffer_insert :: proc(buffer: ^Buffer, char: string) {
     builder: strings.Builder
     current_line := buffer.data[int(buffer.cursor.pos.y)]
+    current_byte := _pos_to_byte(buffer.data[:], buffer.cursor.pos)
+    edit := BufferEdit {
+        content       = char,
+        start_byte    = u32(current_byte),
+        end_byte      = u32(current_byte) + 1,
+        old_end_byte  = u32(current_byte),
+        start_point   = vec2i{buffer.cursor.pos.x, buffer.cursor.pos.y},
+        end_point     = vec2i{buffer.cursor.pos.x + 1, buffer.cursor.pos.y},
+        old_end_point = vec2i{buffer.cursor.pos.x, buffer.cursor.pos.y},
+    }
 
     strings.builder_init(&builder)
     strings.write_string(&builder, current_line[:int(buffer.cursor.pos.x)])
@@ -53,15 +73,25 @@ buffer_insert :: proc(buffer: ^Buffer, char: string) {
 
     buffer.data[int(buffer.cursor.pos.y)] = strings.to_string(builder)
     cursor_move(buffer, x = buffer.cursor.pos.x + 1)
-    treesitter_update(buffer)
+    treesitter_update(buffer, &edit)
     buffer.has_unsaved_changes = true
 }
 
+// TODO: store what content has been removed
 buffer_remove_at_cursor :: proc(buffer: ^Buffer) {
     if buffer.cursor.pos.x == 0 {return}
 
     builder: strings.Builder
     current_line := buffer.data[int(buffer.cursor.pos.y)]
+    current_byte := _pos_to_byte(buffer.data[:], buffer.cursor.pos)
+    edit := BufferEdit {
+        start_byte    = u32(current_byte),
+        end_byte      = u32(current_byte),
+        old_end_byte  = u32(current_byte) + 1,
+        start_point   = vec2i{buffer.cursor.pos.x, buffer.cursor.pos.y},
+        end_point     = vec2i{buffer.cursor.pos.x, buffer.cursor.pos.y},
+        old_end_point = vec2i{buffer.cursor.pos.x + 1, buffer.cursor.pos.y},
+    }
 
     strings.builder_init(&builder)
     strings.write_string(&builder, current_line[:int(buffer.cursor.pos.x) - 1])
@@ -69,6 +99,7 @@ buffer_remove_at_cursor :: proc(buffer: ^Buffer) {
 
     buffer.data[int(buffer.cursor.pos.y)] = strings.to_string(builder)
     cursor_move(buffer, x = buffer.cursor.pos.x - 1)
+    treesitter_update(buffer, &edit)
     buffer.has_unsaved_changes = true
 }
 
@@ -76,15 +107,36 @@ buffer_insert_newline :: proc(buffer: ^Buffer) {
     current_line := buffer.data[buffer.cursor.pos.y]
     text_before_cursor := current_line[:buffer.cursor.pos.x]
     text_beyond_cursor := current_line[buffer.cursor.pos.x:]
+    current_byte := _pos_to_byte(buffer.data[:], buffer.cursor.pos)
+    edit := BufferEdit {
+        content       = "\n",
+        start_byte    = u32(current_byte),
+        end_byte      = u32(current_byte) + 1,
+        old_end_byte  = u32(current_byte),
+        start_point   = vec2i{buffer.cursor.pos.x, buffer.cursor.pos.y},
+        end_point     = vec2i{buffer.cursor.pos.x + 1, buffer.cursor.pos.y},
+        old_end_point = vec2i{buffer.cursor.pos.x, buffer.cursor.pos.y},
+    }
 
     buffer.data[buffer.cursor.pos.y] = text_before_cursor
     inject_at(&buffer.data, buffer.cursor.pos.y + 1, text_beyond_cursor)
     cursor_move(buffer, x = 0, y = buffer.cursor.pos.y + 1)
+    treesitter_update(buffer, &edit)
     buffer.has_unsaved_changes = true
 }
 
 buffer_remove_line :: proc(buffer: ^Buffer) {
     prev_line_content := buffer.data[buffer.cursor.pos.y]
+    current_byte := _pos_to_byte(buffer.data[:], buffer.cursor.pos)
+    edit := BufferEdit {
+        content       = "\n",
+        start_byte    = u32(current_byte),
+        end_byte      = u32(current_byte),
+        old_end_byte  = u32(current_byte) + 1,
+        start_point   = vec2i{buffer.cursor.pos.x, buffer.cursor.pos.y},
+        end_point     = vec2i{buffer.cursor.pos.x, buffer.cursor.pos.y},
+        old_end_point = vec2i{buffer.cursor.pos.x + 1, buffer.cursor.pos.y},
+    }
     ordered_remove(&buffer.data, buffer.cursor.pos.y)
     if buffer.cursor.pos.y != 0 {
         text_on_line_above := buffer.data[buffer.cursor.pos.y - 1]
@@ -93,14 +145,28 @@ buffer_remove_line :: proc(buffer: ^Buffer) {
     } else {
         cursor_move(buffer, x = i32(len(buffer.data[buffer.cursor.pos.y])))
     }
+    treesitter_update(buffer, &edit)
     buffer.has_unsaved_changes = true
 }
 
 buffer_remove_line_content :: proc(buffer: ^Buffer) {
     current_line := buffer.data[buffer.cursor.pos.y]
-    text_beyond_cursor := current_line[buffer.cursor.pos.x:]
-    buffer.data[buffer.cursor.pos.y] = text_beyond_cursor
+    text_before_cursor := current_line[:buffer.cursor.pos.x]
+    text_after_cursor := current_line[buffer.cursor.pos.x:]
+
+    buffer.data[buffer.cursor.pos.y] = text_after_cursor
     cursor_move(buffer, x = 0)
+    current_byte := _pos_to_byte(buffer.data[:], buffer.cursor.pos)
+    edit := BufferEdit {
+        content       = text_before_cursor,
+        start_byte    = u32(current_byte),
+        end_byte      = u32(current_byte),
+        old_end_byte  = u32(current_byte) + u32(len(text_before_cursor)),
+        start_point   = vec2i{buffer.cursor.pos.x, buffer.cursor.pos.y},
+        end_point     = vec2i{buffer.cursor.pos.x, buffer.cursor.pos.y},
+        old_end_point = vec2i{buffer.cursor.pos.x + 1, buffer.cursor.pos.y},
+    }
+    treesitter_update(buffer, &edit)
     buffer.has_unsaved_changes = true
 }
 

@@ -124,7 +124,7 @@ treesitter_get_char_color :: proc(index: int, char: rune, line_num: int) -> sdl.
         return hex_to_sdl_color(editor.current_theme._error)
     }
 
-    return sdl.Color{255, 255, 255, 255}
+    return hex_to_sdl_color(editor.current_theme._default)
 }
 
 treesitter_generate_color_list :: proc() {
@@ -196,31 +196,19 @@ treesitter_renew_tree :: proc(buffer: ^Buffer) {
     ts.parser_parse_string(editor.treesitter.parser, source)
 }
 
-treesitter_update :: proc(buffer: ^Buffer) {
+treesitter_update :: proc(buffer: ^Buffer, edit: ^BufferEdit) {
     previous_buffer_data := strings.split_lines(editor.treesitter.source)
     defer delete(previous_buffer_data)
-    prev_byte := _pos_to_byte(previous_buffer_data, buffer.cursor.prev_pos)
-    cur_byte := _pos_to_byte(editor.active_buffer.data[:], buffer.cursor.pos)
-    start_byte := math.min(prev_byte, cur_byte)
-    prev_point := ts.Point {
-        row = u32(buffer.cursor.prev_pos.y),
-        col = u32(buffer.cursor.prev_pos.x),
-    }
-    cur_point := ts.Point {
-        row = u32(buffer.cursor.pos.y),
-        col = u32(buffer.cursor.pos.x),
-    }
-    start_point := _min_point(prev_point, cur_point)
 
-    edit := ts.Input_Edit {
-        start_byte    = u32(start_byte),
-        old_end_byte  = u32(prev_byte),
-        new_end_byte  = u32(cur_byte),
-        start_point   = start_point,
-        old_end_point = prev_point,
-        new_end_point = cur_point,
+    ts_edit := ts.Input_Edit {
+        start_byte = edit.start_byte,
+        new_end_byte = edit.end_byte,
+        old_end_byte = edit.old_end_byte,
+        start_point = {row = u32(edit.start_point.y), col = u32(edit.start_point.x)},
+        new_end_point = {row = u32(edit.end_point.y), col = u32(edit.end_point.x)},
+        old_end_point = {row = u32(edit.old_end_point.y), col = u32(edit.old_end_point.x)},
     }
-    ts.tree_edit(editor.treesitter.tree, &edit)
+    ts.tree_edit(editor.treesitter.tree, &ts_edit)
 
     new_buffer_string := buffer_to_string(buffer)
     delete(editor.treesitter.source)
