@@ -29,7 +29,7 @@ BufferEdit :: struct {
 }
 
 glyph_map_new :: proc(renderer: ^sdl.Renderer, font: ^ttf.Font) -> map[rune]^sdl.Texture {
-    glyphs_to_generate := "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"!£$%^&*()-_=+[]{};:'@#~,./<>?\\|"
+    glyphs_to_generate := "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\"!£$%^&*()-_=+[]{};:'@#~,./<>?\\| "
     glyph_map := map[rune]^sdl.Texture{}
 
     for glyph in glyphs_to_generate {
@@ -222,7 +222,10 @@ buffer_save :: proc(buffer: ^Buffer) {
 
 buffer_draw_char :: proc(renderer: ^sdl.Renderer, buffer: ^Buffer, text: string, pos: vec2, color: sdl.Color) {
     for char in text {
-        texture := editor.glyph_map[char]
+        texture, ok := editor.glyph_map[char]
+        if !ok {
+            fmt.println("[ERROR]: Failed to get texture for char: ", char)
+        }
         w, h: f32
         sdl.GetTextureSize(texture, &w, &h)
         dst := sdl.FRect {
@@ -270,17 +273,6 @@ buffer_draw :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buffer: ^Buffe
 
     start_draw_line := i32(buffer.viewport_offset.y / get_line_height(window)) - 2
     end_draw_line := (buffer.viewbounds.h) / get_line_height(window) + buffer.viewport_offset.y / get_line_height(window)
-
-    highlight_rect := sdl.FRect {
-        x = buffer.viewport_offset.x,
-        y = ((f32(buffer.cursor.pos.y) * get_line_height(window)) + BUFFER_PADDING - 3) - buffer.viewport_offset.y,
-        w = buffer.viewbounds.w,
-        h = get_line_height(window),
-    }
-    highlight_color := hex_to_sdl_color(editor.current_theme._cursor_highlight)
-    sdl.SetRenderDrawColor(renderer, highlight_color.r, highlight_color.g, highlight_color.b, highlight_color.a)
-    sdl.RenderFillRect(renderer, &highlight_rect)
-
     editor.line_number_section_width = f32(number_of_digits_in_int(len(buffer.data))) * get_character_spacing(window)
 
     char_byte := 0

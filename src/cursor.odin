@@ -122,5 +122,20 @@ cursor_draw :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buffer: ^Buffe
         w = 2,
         h = get_line_height(window),
     }
+    cursor_color := hex_to_sdl_color(editor.current_theme._cursor)
+    sdl.SetRenderDrawColor(renderer, cursor_color.r, cursor_color.g, cursor_color.b, cursor_color.a)
     sdl.RenderFillRect(renderer, &rect)
+}
+
+cursor_draw_highlight :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buffer: ^Buffer) {
+    highlight_rect := sdl.FRect {
+        x = buffer.viewport_offset.x,
+        y = ((f32(buffer.cursor.pos.y) * get_line_height(window)) + BUFFER_PADDING - 3) - buffer.viewport_offset.y,
+        w = buffer.viewbounds.w,
+        h = get_line_height(window),
+    }
+    highlight_color := hex_to_sdl_color(editor.current_theme._cursor_highlight)
+    sdl.SetRenderDrawColor(renderer, highlight_color.r, highlight_color.g, highlight_color.b, highlight_color.a)
+    sdl.SetRenderDrawColor(renderer, 50, 50, 50, 255)
+    sdl.RenderFillRect(renderer, &highlight_rect)
 }

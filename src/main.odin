@@ -18,7 +18,7 @@ TAB_WIDTH :: 4
 SCROLL_SPEED :: 6
 SCROLL_FRICTION :: 0.2
 SCROLL_MARGIN :: 3
-LOADED_FILE :: "src/main.odin"
+LOADED_FILE :: "test.txt"
 vec2 :: [2]f32
 vec2i :: [2]i32
 
@@ -337,12 +337,9 @@ main :: proc() {
         bg_color := hex_to_sdl_color(editor.current_theme._bg)
         sdl.SetRenderDrawColor(sdl_renderer, bg_color.r, bg_color.g, bg_color.b, bg_color.a)
         sdl.RenderClear(sdl_renderer)
+        cursor_draw_highlight(sdl_window, sdl_renderer, editor.active_buffer)
         buffer_draw(sdl_window, sdl_renderer, editor.active_buffer)
-
-        cursor_color := hex_to_sdl_color(editor.current_theme._cursor)
-        sdl.SetRenderDrawColor(sdl_renderer, cursor_color.r, cursor_color.g, cursor_color.b, cursor_color.a)
         cursor_draw(sdl_window, sdl_renderer, editor.active_buffer)
-
         sdl.RenderPresent(sdl_renderer)
 
         if editor.requested_exit {
