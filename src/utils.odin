@@ -1,5 +1,6 @@
 package main
 
+import "core:fmt"
 import "core:math"
 import "core:strings"
 import sdl "vendor:sdl3"
@@ -73,4 +74,11 @@ number_of_digits_in_int :: proc(i: int) -> int {
     if math.abs(i) < 100_000_000 {return 8}
     if math.abs(i) < 1_000_000_000 {return 9}
     return 10
+}
+
+hex_to_int :: proc(hex: u8) -> int {
+    if hex >= u8('0') && hex <= u8('9') {return int(hex) - 48}
+    if hex >= u8('a') && hex <= u8('f') {return int(hex) - 87}
+    if hex >= u8('A') && hex <= u8('F') {return int(hex) - 55}
+    return 0
 }

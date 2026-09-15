@@ -149,31 +149,13 @@ hex_to_sdl_color :: proc(hex_color: string) -> sdl.Color {
             return sdl.Color{255, 255, 255, 255}
         }
     }
+
     red_hex := base[:2]
     green_hex := base[2:4]
     blue_hex := base[4:]
-
-    hex_decimal_map := make(map[u8]int); defer delete(hex_decimal_map)
-    hex_decimal_map['0'] = 0
-    hex_decimal_map['1'] = 1
-    hex_decimal_map['2'] = 2
-    hex_decimal_map['3'] = 3
-    hex_decimal_map['4'] = 4
-    hex_decimal_map['5'] = 5
-    hex_decimal_map['6'] = 6
-    hex_decimal_map['7'] = 7
-    hex_decimal_map['8'] = 8
-    hex_decimal_map['9'] = 9
-    hex_decimal_map['a'] = 10
-    hex_decimal_map['b'] = 11
-    hex_decimal_map['c'] = 12
-    hex_decimal_map['d'] = 13
-    hex_decimal_map['e'] = 14
-    hex_decimal_map['f'] = 15
-
-    r := (hex_decimal_map[red_hex[0]] * 16) + hex_decimal_map[red_hex[1]]
-    g := (hex_decimal_map[green_hex[0]] * 16) + hex_decimal_map[green_hex[1]]
-    b := (hex_decimal_map[blue_hex[0]] * 16) + hex_decimal_map[blue_hex[1]]
+    r := (hex_to_int(red_hex[0]) * 16) + hex_to_int(red_hex[1])
+    g := (hex_to_int(green_hex[0]) * 16) + hex_to_int(green_hex[1])
+    b := (hex_to_int(blue_hex[0]) * 16) + hex_to_int(blue_hex[1])
 
     return sdl.Color{u8(r), u8(g), u8(b), 255}
 }
