@@ -136,6 +136,5 @@ cursor_draw_highlight :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buff
     }
     highlight_color := hex_to_sdl_color(editor.current_theme._cursor_highlight)
     sdl.SetRenderDrawColor(renderer, highlight_color.r, highlight_color.g, highlight_color.b, highlight_color.a)
-    sdl.SetRenderDrawColor(renderer, 50, 50, 50, 255)
     sdl.RenderFillRect(renderer, &highlight_rect)
 }
