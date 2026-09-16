@@ -18,7 +18,7 @@ TAB_WIDTH :: 4
 SCROLL_SPEED :: 6
 SCROLL_FRICTION :: 0.2
 SCROLL_MARGIN :: 3
-LOADED_FILE :: "test.txt"
+LOADED_FILE :: "src/main.odin"
 vec2 :: [2]f32
 vec2i :: [2]i32
 
@@ -40,6 +40,13 @@ MouseCursors :: struct {
     text:    ^sdl.Cursor,
 }
 
+CursorMode :: enum {
+    NORMAL,
+    INSERT,
+    VISUAL,
+    VISUAL_BLOCK,
+}
+
 Editor :: struct {
     running:                   bool,
     requested_exit:            bool,
@@ -56,6 +63,7 @@ Editor :: struct {
     mouse_pos:                 vec2i,
     mouse_cursors:             MouseCursors,
     line_number_section_width: f32,
+    cursor_mode:               CursorMode,
 }
 
 SaveModalOption :: enum {
@@ -66,7 +74,7 @@ SaveModalOption :: enum {
 
 editor := Editor {
     running       = true,
-    current_theme = theme_gruvbox_dark,
+    current_theme = theme_github_light,
 }
 
 calc_frame_info :: proc() {
@@ -108,14 +116,35 @@ camera_update :: proc(window: ^sdl.Window, buffer: ^Buffer) {
     if math.abs(editor.camera_scroll_vel.y) < 0.001 {editor.camera_scroll_vel.y = 0}
 }
 
+handle_keyboard_cursor_movement :: proc(window: ^sdl.Window, key: sdl.Scancode) {
+    #partial switch key {
+    case .I:
+        editor.cursor_mode = .INSERT
+        ok := sdl.StartTextInput(window)
+    case .H:
+        cursor_move(editor.active_buffer, x = editor.active_buffer.cursor.pos.x - 1)
+    case .J:
+        cursor_move(editor.active_buffer, y = editor.active_buffer.cursor.pos.y + 1)
+    case .K:
+        cursor_move(editor.active_buffer, y = editor.active_buffer.cursor.pos.y - 1)
+    case .L:
+        cursor_move(editor.active_buffer, x = editor.active_buffer.cursor.pos.x + 1)
+    }
+}
+
 sdl_handle_event :: proc(window: ^sdl.Window, buffer: ^Buffer, event: sdl.Event) {
     #partial switch event.type {
     case .QUIT:
         editor.requested_exit = true
     case .TEXT_INPUT:
-        buffer_handle_input(buffer, event.text.text)
+        if editor.cursor_mode == .INSERT {
+            buffer_handle_input(buffer, event.text.text)
+        }
     case .KEY_DOWN:
         editor.treesitter.outdated = true
+        if editor.cursor_mode != .INSERT {
+            handle_keyboard_cursor_movement(window, event.key.scancode)
+        }
         #partial switch event.key.scancode {
         case .TAB:
             for i in 0 ..< TAB_WIDTH {
@@ -157,7 +186,6 @@ sdl_handle_event :: proc(window: ^sdl.Window, buffer: ^Buffer, event: sdl.Event)
             cursor_move(buffer, x = buffer.cursor.pos.x - 1)
         case .RIGHT:
             cursor_move(buffer, x = buffer.cursor.pos.x + 1)
-
         case .O:
             if editor.keyboard.holding_cmd {
                 show_open_file_dialog(window)
@@ -166,6 +194,9 @@ sdl_handle_event :: proc(window: ^sdl.Window, buffer: ^Buffer, event: sdl.Event)
             if editor.keyboard.holding_cmd {
                 buffer_save(editor.active_buffer)
             }
+        case .ESCAPE:
+            editor.cursor_mode = .NORMAL
+            ok := sdl.StopTextInput(window)
         }
 
     case .KEY_UP:
@@ -314,13 +345,9 @@ main :: proc() {
     sdl_window, sdl_renderer := sdl_init()
     active_buffers := make([dynamic]Buffer); defer delete(active_buffers)
     ttf_init := ttf.Init(); assert(ttf_init)
-    font := ttf.OpenFont("GeistMono-SemiBold.ttf", get_font_size(sdl_window))
+    font := ttf.OpenFont("GeistMono-Medium.ttf", get_font_size(sdl_window))
     keyboard: Keyboard
     editor.glyph_map = glyph_map_new(sdl_renderer, font)
-    ok := sdl.StartTextInput(sdl_window)
-    if !ok {
-        fmt.println("[ERROR]: Failed to start text input")
-    }
     treesitter_init()
     mouse_cursors_init()
     buffer_load(LOADED_FILE)
@@ -333,6 +360,7 @@ main :: proc() {
         cursor_update(editor.active_buffer)
         buffer_update(sdl_window, editor.active_buffer)
         mouse_cursors_update()
+
 
         bg_color := hex_to_sdl_color(editor.current_theme._bg)
         sdl.SetRenderDrawColor(sdl_renderer, bg_color.r, bg_color.g, bg_color.b, bg_color.a)

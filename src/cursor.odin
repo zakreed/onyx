@@ -119,7 +119,7 @@ cursor_draw :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buffer: ^Buffe
         x = ((f32(buffer.cursor.pos.x) * get_character_spacing(window)) +
             BUFFER_PADDING) - buffer.viewport_offset.x + (editor.line_number_section_width + BUFFER_PADDING),
         y = ((f32(buffer.cursor.pos.y) * get_line_height(window)) + BUFFER_PADDING - 3) - buffer.viewport_offset.y,
-        w = 2,
+        w = editor.cursor_mode == .INSERT ? 2 : 8,
         h = get_line_height(window),
     }
     cursor_color := hex_to_sdl_color(editor.current_theme._cursor)
