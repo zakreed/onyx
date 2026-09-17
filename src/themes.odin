@@ -136,6 +136,7 @@ theme_github_light := Theme {
     _error                 = "CF212E",
 }
 
+@(optimization_mode = "none")
 hex_to_sdl_color :: proc(hex_color: string) -> sdl.Color {
     if hex_color == "" {
         fmt.println("[WARNING]: Passed in empty color to hex_to_sdl_color()")

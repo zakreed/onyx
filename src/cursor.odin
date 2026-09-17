@@ -112,6 +112,7 @@ cursor_update :: proc(buffer: ^Buffer) {
     }
 }
 
+@(optimization_mode = "none")
 cursor_draw :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buffer: ^Buffer) {
     if !buffer.cursor.visible {return}
 
@@ -127,6 +128,7 @@ cursor_draw :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buffer: ^Buffe
     sdl.RenderFillRect(renderer, &rect)
 }
 
+@(optimization_mode = "none")
 cursor_draw_highlight :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buffer: ^Buffer) {
     highlight_rect := sdl.FRect {
         x = buffer.viewport_offset.x,

@@ -362,6 +362,13 @@ mouse_cursors_update :: proc() {
     }
 }
 
+@(optimization_mode = "none")
+bg_render :: proc(renderer: ^sdl.Renderer) {
+    bg_color := hex_to_sdl_color(editor.current_theme._bg)
+    sdl.SetRenderDrawColor(renderer, bg_color.r, bg_color.g, bg_color.b, bg_color.a)
+    sdl.RenderClear(renderer)
+}
+
 main :: proc() {
     sdl_window, sdl_renderer := sdl_init()
     active_buffers := make([dynamic]Buffer); defer delete(active_buffers)
@@ -382,10 +389,7 @@ main :: proc() {
         buffer_update(sdl_window, editor.active_buffer)
         mouse_cursors_update()
 
-
-        bg_color := hex_to_sdl_color(editor.current_theme._bg)
-        sdl.SetRenderDrawColor(sdl_renderer, bg_color.r, bg_color.g, bg_color.b, bg_color.a)
-        sdl.RenderClear(sdl_renderer)
+        bg_render(sdl_renderer)
         cursor_draw_highlight(sdl_window, sdl_renderer, editor.active_buffer)
         buffer_draw(sdl_window, sdl_renderer, editor.active_buffer)
         cursor_draw(sdl_window, sdl_renderer, editor.active_buffer)

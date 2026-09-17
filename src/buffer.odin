@@ -220,6 +220,7 @@ buffer_save :: proc(buffer: ^Buffer) {
     fmt.println("written to", buffer.filename)
 }
 
+@(optimization_mode = "none")
 buffer_draw_char :: proc(renderer: ^sdl.Renderer, buffer: ^Buffer, text: string, pos: vec2, color: sdl.Color) {
     for char in text {
         texture, ok := editor.glyph_map[char]
@@ -251,6 +252,7 @@ buffer_update :: proc(window: ^sdl.Window, buffer: ^Buffer) {
     buffer.viewbounds.h = f32(h)
 }
 
+@(optimization_mode = "none")
 _buffer_draw_line_number :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buffer: ^Buffer, line: int, section_width: f32) {
     xpos := BUFFER_PADDING + (section_width - f32(number_of_digits_in_int(line)) * get_character_spacing(window))
     ypos := BUFFER_PADDING + (f32(line - 1) * get_line_height(window))
@@ -265,6 +267,7 @@ _buffer_draw_line_number :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, b
     }
 }
 
+@(optimization_mode = "none")
 buffer_draw :: proc(window: ^sdl.Window, renderer: ^sdl.Renderer, buffer: ^Buffer) {
     if editor.treesitter.outdated {
         treesitter_generate_color_list()
