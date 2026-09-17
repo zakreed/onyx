@@ -82,3 +82,16 @@ hex_to_int :: proc(hex: u8) -> int {
     if hex >= u8('A') && hex <= u8('F') {return int(hex) - 55}
     return 0
 }
+
+// return the position of the first non whitespace character of a given line
+first_non_whitespace_pos :: proc(buffer: ^Buffer, line_number: int) -> int {
+    for char, i in buffer.data[line_number] {
+        if char != ' ' {
+            buffer.cursor.pos.x = i32(i)
+            buffer.cursor.desired_x = buffer.cursor.pos.x
+            return i
+        }
+    }
+
+    return 0
+}

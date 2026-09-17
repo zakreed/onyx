@@ -74,7 +74,7 @@ SaveModalOption :: enum {
 
 editor := Editor {
     running       = true,
-    current_theme = theme_github_light,
+    current_theme = theme_gruvbox_dark,
 }
 
 calc_frame_info :: proc() {
@@ -121,6 +121,23 @@ handle_keyboard_cursor_movement :: proc(window: ^sdl.Window, key: sdl.Scancode) 
     case .I:
         editor.cursor_mode = .INSERT
         ok := sdl.StartTextInput(window)
+        if editor.keyboard.holding_shift {
+            cursor_move(
+                editor.active_buffer,
+                x = i32(first_non_whitespace_pos(editor.active_buffer, int(editor.active_buffer.cursor.pos.y))),
+            )
+        } else {
+            cursor_move(editor.active_buffer, x = editor.active_buffer.cursor.pos.x + 1)
+        }
+    case .A:
+        editor.cursor_mode = .INSERT
+        if editor.keyboard.holding_shift {
+            current_line := editor.active_buffer.data[editor.active_buffer.cursor.pos.y]
+            cursor_move(editor.active_buffer, x = i32(len(current_line)))
+        } else {
+            cursor_move(editor.active_buffer, x = editor.active_buffer.cursor.pos.x + 1)
+        }
+        ok := sdl.StartTextInput(window)
     case .H:
         cursor_move(editor.active_buffer, x = editor.active_buffer.cursor.pos.x - 1)
     case .J:
@@ -152,6 +169,8 @@ sdl_handle_event :: proc(window: ^sdl.Window, buffer: ^Buffer, event: sdl.Event)
             }
         case .LGUI:
             editor.keyboard.holding_cmd = true
+        case .LSHIFT, .RSHIFT:
+            editor.keyboard.holding_shift = true
         case .BACKSPACE:
             if buffer.cursor.pos == 0 {return}
             if buffer.cursor.pos.x == 0 {
@@ -203,6 +222,8 @@ sdl_handle_event :: proc(window: ^sdl.Window, buffer: ^Buffer, event: sdl.Event)
         #partial switch event.key.scancode {
         case .LGUI:
             editor.keyboard.holding_cmd = false
+        case .LSHIFT, .RSHIFT:
+            editor.keyboard.holding_shift = false
         }
     case .MOUSE_WHEEL:
         if event.wheel.y != 0 {
